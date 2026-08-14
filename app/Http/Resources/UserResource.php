@@ -27,6 +27,17 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'locker_code' => $this->locker_code,
+            'email_verified' => $this->hasVerifiedEmail(),
+            'authorized_persons' => $this->whenLoaded(
+                'authorizedPersons',
+                fn () => $this->authorizedPersons->map(fn ($person) => [
+                    'id' => $person->id,
+                    'name' => $person->name,
+                    'identification' => $person->identification,
+                    'phone' => $person->phone,
+                ]),
+                [],
+            ),
             'shipping_address' => $address && $address->exists ? [
                 'province' => $address->province?->name,
                 'canton' => $address->canton?->name,

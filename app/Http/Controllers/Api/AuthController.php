@@ -173,6 +173,7 @@ class AuthController extends Controller
     private function withRelations(User $user): User
     {
         return $user->load([
+            'authorizedPersons',
             'defaultShippingAddress.province',
             'defaultShippingAddress.canton',
             'defaultShippingAddress.district',

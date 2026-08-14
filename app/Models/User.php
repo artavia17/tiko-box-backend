@@ -61,7 +61,19 @@ class User extends Authenticatable
         return $this->hasMany(ShippingAddress::class);
     }
 
-    /** @return HasOne<ShippingAddress, $this> */
+    /**  HasMany<AuthorizedPerson, $this> */
+    public function authorizedPersons(): HasMany
+    {
+        return $this->hasMany(AuthorizedPerson::class);
+    }
+
+    /**  HasMany<Prealert, $this> */
+    public function prealerts(): HasMany
+    {
+        return $this->hasMany(Prealert::class);
+    }
+
+    /**  HasOne<ShippingAddress, $this> */
     public function defaultShippingAddress(): HasOne
     {
         return $this->hasOne(ShippingAddress::class)->where('is_default', true);
