@@ -48,12 +48,31 @@ class AccountController extends Controller
 
             'authorized_persons' => ['array', 'max:2'],
             'authorized_persons.*.name' => ['required', 'string', 'max:150'],
+            'authorized_persons.*.identification_type' => [
+                'required',
+                Rule::in(['nacional', 'extranjero']),
+            ],
             'authorized_persons.*.identification' => ['required', 'string', 'max:30'],
             'authorized_persons.*.phone' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
         ], [
             'phone.regex' => 'El teléfono debe tener el formato 8888-8888.',
             'authorized_persons.*.phone.regex' => 'El teléfono debe tener el formato 8888-8888.',
         ]);
+
+        // El formato de la identificación depende del tipo de cada persona.
+        foreach ($data['authorized_persons'] ?? [] as $index => $person) {
+            $pattern = $person['identification_type'] === 'extranjero'
+                ? '/^[A-Z0-9]{6,10}$/'
+                : '/^\d-\d{4}-\d{4}$/';
+
+            if (! preg_match($pattern, $person['identification'])) {
+                throw ValidationException::withMessages([
+                    "authorized_persons.{$index}.identification" => $person['identification_type'] === 'extranjero'
+                        ? 'El DIMEX o pasaporte debe tener entre 6 y 10 caracteres, solo letras y números.'
+                        : 'La cédula debe tener el formato 1-2345-6789.',
+                ]);
+            }
+        }
 
         $emailChanged = $data['email'] !== $user->email;
 

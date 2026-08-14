@@ -18,7 +18,7 @@ class EmailVerificationService
 {
     public function send(User $user): void
     {
-        $code = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         EmailVerificationCode::updateOrCreate(
             ['user_id' => $user->id],

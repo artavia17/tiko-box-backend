@@ -67,7 +67,7 @@ class AuthController extends Controller
         return response()->json([
             'requires_verification' => true,
             'email' => $user->email,
-            'message' => 'Te enviamos un código de 4 dígitos a tu correo.',
+            'message' => 'Te enviamos un código de 6 dígitos a tu correo.',
         ], 201);
     }
 
@@ -104,13 +104,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Confirma el correo con el código de 4 dígitos y entrega el token.
+     * Confirma el correo con el código de 6 dígitos y entrega el token.
      */
     public function verifyEmail(Request $request): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
-            'code' => ['required', 'string', 'regex:/^\d{4}$/'],
+            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
         ]);
 
         $user = User::where('email', $data['email'])->first();

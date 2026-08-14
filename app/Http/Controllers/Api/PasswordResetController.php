@@ -26,7 +26,7 @@ class PasswordResetController extends Controller
         $user = User::where('email', $data['email'])->first();
 
         if ($user) {
-            $code = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
             DB::table('password_reset_tokens')->updateOrInsert(
                 ['email' => $user->email],
@@ -46,7 +46,7 @@ class PasswordResetController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
-            'code' => ['required', 'string', 'regex:/^\d{4}$/'],
+            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
