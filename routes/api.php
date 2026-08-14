@@ -5,6 +5,11 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/health', fn () => response()->json([
+    'status' => 'ok',
+    'service' => 'tikabox-api',
+]));
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/email/verify', [AuthController::class, 'verifyEmail']);

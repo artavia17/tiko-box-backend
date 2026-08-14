@@ -3,20 +3,22 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Request;
+
+/*
+| Este proyecto es solo API: no hay rutas web ni vistas. Todo lo que no
+| coincida con una ruta de /api responde 404 en JSON.
+*/
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
-        health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Sin rutas web no hay a dónde redirigir: los invitados reciben 401 JSON.
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
-        );
+        // Siempre JSON, incluso cuando el navegador pide HTML.
+        $exceptions->shouldRenderJsonWhen(fn () => true);
     })->create();
