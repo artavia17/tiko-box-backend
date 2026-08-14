@@ -25,16 +25,25 @@ class RegisterRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'second_last_name' => ['nullable', 'string', 'max:100'],
-            'identification' => ['required', 'string', 'max:30', Rule::unique('users', 'identification')],
-            'phone' => ['required', 'string', 'max:30'],
+            'identification_type' => ['required', Rule::in(['nacional', 'extranjero'])],
+            'identification' => [
+                'required',
+                'string',
+                Rule::unique('users', 'identification'),
+                // Nacional: 1-2345-6789. Extranjero: hasta 10 alfanuméricos en mayúscula.
+                $this->input('identification_type') === 'extranjero'
+                    ? 'regex:/^[A-Z0-9]{6,10}$/'
+                    : 'regex:/^\d-\d{4}-\d{4}$/',
+            ],
+            'phone' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
 
             // Paso 2: dirección de envío en Costa Rica
             'province_id' => ['required', 'integer', Rule::exists('provinces', 'id')],
             'canton_id' => ['required', 'integer', Rule::exists('cantons', 'id')],
             'district_id' => ['required', 'integer', Rule::exists('districts', 'id')],
             'exact_address' => ['required', 'string', 'max:500'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
 
             // Paso 3: datos de la cuenta
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
@@ -61,6 +70,19 @@ class RegisterRequest extends FormRequest
                     $validator->errors()->add('district_id', 'El distrito no pertenece al cantón seleccionado.');
                 }
             },
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'identification.regex' => $this->input('identification_type') === 'extranjero'
+                ? 'El DIMEX o pasaporte debe tener entre 6 y 10 caracteres, solo letras y números.'
+                : 'La cédula debe tener el formato 1-2345-6789.',
+            'phone.regex' => 'El teléfono debe tener el formato 8888-8888.',
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\ShippingAddress;
 use App\Models\User;
+use App\Services\EmailVerificationService;
 use App\Services\LockerCodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +17,14 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly EmailVerificationService $verification,
+    ) {}
+
     /**
-     * Registro: crea la cuenta, asigna el casillero y guarda la dirección de envío.
+     * Registro: crea la cuenta, asigna el casillero, guarda la dirección de
+     * envío y manda el código de verificación. No entrega token todavía: la
+     * cuenta no sirve hasta confirmar el correo.
      */
     public function register(RegisterRequest $request, LockerCodeGenerator $lockers): JsonResponse
     {
@@ -28,6 +35,7 @@ class AuthController extends Controller
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'second_last_name' => $data['second_last_name'] ?? null,
+                'identification_type' => $data['identification_type'],
                 'identification' => $data['identification'],
                 'phone' => $data['phone'],
                 'locker_code' => $lockers->next(),
@@ -46,20 +54,27 @@ class AuthController extends Controller
                 'canton_id' => $data['canton_id'],
                 'district_id' => $data['district_id'],
                 'exact_address' => $data['exact_address'],
-                'latitude' => $data['latitude'] ?? null,
-                'longitude' => $data['longitude'] ?? null,
+                'latitude' => $data['latitude'],
+                'longitude' => $data['longitude'],
                 'is_default' => true,
             ]);
 
             return $user;
         });
 
+        $this->verification->send($user);
+
         return response()->json([
-            'token' => $user->createToken('tikabox')->plainTextToken,
-            'user' => new UserResource($this->withRelations($user)),
+            'requires_verification' => true,
+            'email' => $user->email,
+            'message' => 'Te enviamos un código de 4 dígitos a tu correo.',
         ], 201);
     }
 
+    /**
+     * Login. Si el correo no está verificado, reenvía el código y le pide al
+     * frontend que muestre la pantalla de verificación.
+     */
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -75,9 +90,63 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! $user->hasVerifiedEmail()) {
+            $this->verification->send($user);
+
+            return response()->json([
+                'requires_verification' => true,
+                'email' => $user->email,
+                'message' => 'Te reenviamos el código para confirmar tu correo.',
+            ], 403);
+        }
+
+        return $this->tokenResponse($user);
+    }
+
+    /**
+     * Confirma el correo con el código de 4 dígitos y entrega el token.
+     */
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'regex:/^\d{4}$/'],
+        ]);
+
+        $user = User::where('email', $data['email'])->first();
+
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'email' => 'No encontramos una cuenta con ese correo.',
+            ]);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return $this->tokenResponse($user);
+        }
+
+        $result = $this->verification->verify($user, $data['code']);
+
+        if (! $result['ok']) {
+            throw ValidationException::withMessages(['code' => $result['error']]);
+        }
+
+        return $this->tokenResponse($user);
+    }
+
+    public function resendCode(Request $request): JsonResponse
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+
+        $user = User::where('email', $data['email'])->first();
+
+        // No revelamos si el correo existe o no.
+        if ($user && ! $user->hasVerifiedEmail()) {
+            $this->verification->send($user);
+        }
+
         return response()->json([
-            'token' => $user->createToken('tikabox')->plainTextToken,
-            'user' => new UserResource($this->withRelations($user)),
+            'message' => 'Si la cuenta existe y está sin confirmar, te enviamos un código nuevo.',
         ]);
     }
 
@@ -91,6 +160,14 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Sesión cerrada.']);
+    }
+
+    private function tokenResponse(User $user): JsonResponse
+    {
+        return response()->json([
+            'token' => $user->createToken('tikabox')->plainTextToken,
+            'user' => new UserResource($this->withRelations($user)),
+        ]);
     }
 
     private function withRelations(User $user): User

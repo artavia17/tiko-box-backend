@@ -16,6 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
     'first_name',
     'last_name',
     'second_last_name',
+    'identification_type',
     'identification',
     'phone',
     'locker_code',
