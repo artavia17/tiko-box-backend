@@ -35,7 +35,12 @@ class RegisterRequest extends FormRequest
                     ? 'regex:/^[A-Z0-9]{6,10}$/'
                     : 'regex:/^\d-\d{4}-\d{4}$/',
             ],
-            'phone' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+            'phone' => [
+                'required',
+                'string',
+                'regex:/^\d{4}-\d{4}$/',
+                Rule::unique('users', 'phone'),
+            ],
 
             // Paso 2: dirección de envío en Costa Rica
             'province_id' => ['required', 'integer', Rule::exists('provinces', 'id')],

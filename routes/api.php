@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,7 @@ Route::get('/health', fn () => response()->json([
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/check-availability', [AvailabilityController::class, 'check']);
 Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
 Route::post('/email/resend', [AuthController::class, 'resendCode']);
 
