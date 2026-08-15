@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'tracking_number',
     'origin',
     'courier',
+    'currency',
     'expected_arrival',
     'status',
     'notes',

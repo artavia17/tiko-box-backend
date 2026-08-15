@@ -43,6 +43,7 @@ class PrealertController extends Controller
                 'tracking_number' => strtoupper($data['tracking_number']),
                 'origin' => $data['origin'],
                 'courier' => $data['courier'] ?? null,
+                'currency' => $data['currency'],
                 'expected_arrival' => $data['expected_arrival'] ?? null,
                 'notes' => $data['notes'] ?? null,
             ]);
@@ -79,6 +80,7 @@ class PrealertController extends Controller
             ],
             'origin' => ['required', 'string', 'max:60'],
             'courier' => ['nullable', 'string', 'max:60'],
+            'currency' => ['required', Rule::in(['USD', 'CRC'])],
             'expected_arrival' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
 
@@ -100,6 +102,7 @@ class PrealertController extends Controller
             'tracking_number' => $prealert->tracking_number,
             'origin' => $prealert->origin,
             'courier' => $prealert->courier,
+            'currency' => $prealert->currency,
             'expected_arrival' => $prealert->expected_arrival?->toDateString(),
             'status' => $prealert->status,
             'notes' => $prealert->notes,
