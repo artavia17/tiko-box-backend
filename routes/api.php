@@ -50,5 +50,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Prealertas
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);
+    Route::put('/prealerts/{prealert}', [PrealertController::class, 'update']);
     Route::delete('/prealerts/{prealert}', [PrealertController::class, 'destroy']);
 });
