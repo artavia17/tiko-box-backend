@@ -8,6 +8,9 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PrealertController;
+use App\Http\Controllers\Api\Staff\CustomerController;
+use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
+use App\Http\Controllers\Api\Staff\StaffAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json([
@@ -30,6 +33,42 @@ Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 Route::get('/provinces', [LocationController::class, 'provinces']);
 Route::get('/provinces/{province}/cantons', [LocationController::class, 'cantons']);
 Route::get('/cantons/{canton}/districts', [LocationController::class, 'districts']);
+
+/*
+|--------------------------------------------------------------------------
+| App interna (almacén)
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/staff/login', [StaffAuthController::class, 'login']);
+
+Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function () {
+    Route::get('/me', [StaffAuthController::class, 'me']);
+    Route::post('/logout', [StaffAuthController::class, 'logout']);
+
+    // Clientes
+    Route::get('/customers', [CustomerController::class, 'index']);
+    Route::get('/customers/{customer}', [CustomerController::class, 'show']);
+
+    // Paquetes
+    Route::get('/summary', [StaffPackageController::class, 'summary']);
+    Route::get('/packages', [StaffPackageController::class, 'index']);
+    Route::post('/packages', [StaffPackageController::class, 'store']);
+    Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
+    Route::delete('/packages/{package}', [StaffPackageController::class, 'destroy']);
+});
+
+// Gestión del personal: solo administradores.
+Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(function () {
+    Route::get('/users', [StaffAuthController::class, 'index']);
+    Route::post('/users', [StaffAuthController::class, 'store']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| App de clientes
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
