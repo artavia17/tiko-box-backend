@@ -69,6 +69,7 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
 // Gestión del personal: solo administradores.
 Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(function () {
     Route::post('/catalog', [CatalogController::class, 'store']);
+    Route::post('/catalog/import', [CatalogController::class, 'import']);
     Route::delete('/catalog/{option}', [CatalogController::class, 'destroy']);
     Route::get('/stats', [AdminController::class, 'stats']);
     Route::get('/today', [AdminController::class, 'today']);

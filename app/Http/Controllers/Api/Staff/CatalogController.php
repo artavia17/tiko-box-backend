@@ -49,6 +49,53 @@ class CatalogController extends Controller
         return response()->json(['data' => ['id' => $option->id, 'name' => $option->name]], 201);
     }
 
+    /**
+     * Alta en lote: se pega la lista y se agrega lo que falte.
+     *
+     * Sirve para traer las listas de otro sistema sin teclearlas una por una.
+     */
+    public function import(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', Rule::in(CatalogOption::TYPES)],
+            'names' => ['required', 'array', 'min:1', 'max:500'],
+            'names.*' => ['string', 'max:80'],
+        ]);
+
+        $existing = CatalogOption::where('type', $data['type'])
+            ->pluck('name')
+            ->map(fn (string $name) => mb_strtolower($name))
+            ->all();
+
+        $added = 0;
+        $skipped = 0;
+        $seen = [];
+
+        foreach ($data['names'] as $raw) {
+            $name = trim($raw);
+            $key = mb_strtolower($name);
+
+            // Se ignoran las vacías, las repetidas dentro del propio pegado y
+            // las que ya estaban en la lista.
+            if ($name === '' || in_array($key, $seen, true) || in_array($key, $existing, true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            CatalogOption::create(['type' => $data['type'], 'name' => $name]);
+            $seen[] = $key;
+            $added++;
+        }
+
+        return response()->json([
+            'data' => ['added' => $added, 'skipped' => $skipped],
+            'message' => $added === 0
+                ? 'Ya estaban todas en la lista.'
+                : "Se agregaron {$added}".($skipped > 0 ? ", {$skipped} ya estaban." : '.'),
+        ]);
+    }
+
     /** Baja: solo administración. */
     public function destroy(CatalogOption $option): JsonResponse
     {
