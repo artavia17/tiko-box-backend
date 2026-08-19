@@ -16,7 +16,7 @@ class PackageController extends Controller
     {
         $packages = $request->user()
             ->packages()
-            ->with('events')
+            ->with(['events', 'photos'])
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where('tracking_number', 'like', "%{$search}%");
             })
@@ -45,7 +45,7 @@ class PackageController extends Controller
     {
         abort_unless($package->user_id === $request->user()->id, 404);
 
-        return response()->json(['data' => $this->present($package->load('events'))]);
+        return response()->json(['data' => $this->present($package->load(['events', 'photos']))]);
     }
 
     /** @return array<string, mixed> */
@@ -66,7 +66,7 @@ class PackageController extends Controller
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
             'delivered_to_name' => $package->delivered_to_name,
             'has_signature' => (bool) $package->signature_path,
-            'has_photo' => (bool) $package->photo_path,
+            'photos' => $package->photos->map(fn ($photo) => ['id' => $photo->id]),
             'events' => $package->events->map(fn (PackageEvent $event) => [
                 'id' => $event->id,
                 'status' => $event->status,

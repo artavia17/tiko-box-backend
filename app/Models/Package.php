@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'courier',
     'store',
     'description',
-    'photo_path',
     'weight_lb',
     'price_per_pound',
     'total',
@@ -50,6 +49,12 @@ class Package extends Model
     public function registeredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    /** @return HasMany<PackagePhoto, $this> */
+    public function photos(): HasMany
+    {
+        return $this->hasMany(PackagePhoto::class)->oldest();
     }
 
     /** @return HasMany<PackageEvent, $this> */

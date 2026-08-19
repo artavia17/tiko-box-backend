@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PrealertController;
 use App\Http\Controllers\Api\Staff\AdminController;
+use App\Http\Controllers\Api\Staff\CatalogController;
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
@@ -57,6 +58,7 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     // Paquetes
     Route::get('/summary', [StaffPackageController::class, 'summary']);
     Route::get('/prealerts', [StaffPrealertController::class, 'index']);
+    Route::get('/catalog', [CatalogController::class, 'index']);
     Route::get('/packages', [StaffPackageController::class, 'index']);
     Route::post('/packages', [StaffPackageController::class, 'store']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
@@ -66,6 +68,8 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
 
 // Gestión del personal: solo administradores.
 Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(function () {
+    Route::post('/catalog', [CatalogController::class, 'store']);
+    Route::delete('/catalog/{option}', [CatalogController::class, 'destroy']);
     Route::get('/stats', [AdminController::class, 'stats']);
     Route::get('/today', [AdminController::class, 'today']);
     Route::get('/users', [StaffUserController::class, 'index']);
@@ -99,7 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/packages', [PackageController::class, 'index']);
     Route::get('/packages/{package}', [PackageController::class, 'show']);
     Route::get('/packages/{package}/signature', [StaffPackageController::class, 'signature']);
-    Route::get('/packages/{package}/photo', [StaffPackageController::class, 'photo']);
+    Route::get('/packages/{package}/photos/{photo}', [StaffPackageController::class, 'photo']);
 
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);
