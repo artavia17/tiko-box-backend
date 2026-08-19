@@ -23,7 +23,7 @@ class CustomerController extends Controller
         abort_if($search === '' && ! $request->user()->isAdmin(), 403,
             'Buscá al cliente por nombre, cédula o correo.');
 
-        $customers = User::where('role', 'cliente')
+        $customers = User::customers()
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     foreach (['locker_code', 'name', 'identification', 'email', 'phone'] as $field) {
@@ -48,7 +48,7 @@ class CustomerController extends Controller
     /** Ficha completa: es lo que se consulta antes de entregar un paquete. */
     public function show(Request $request, User $customer): JsonResponse
     {
-        abort_unless($customer->role === 'cliente', 404);
+        abort_unless($customer->isCustomer(), 404);
 
         $customer->load([
             'shippingAddresses.province',

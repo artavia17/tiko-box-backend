@@ -57,10 +57,10 @@ class AdminController extends Controller
                     'registrados_periodo' => Package::whereBetween('received_at', [$from, $to])->count(),
                 ],
                 'customers' => [
-                    'total' => User::where('role', 'cliente')->count(),
-                    'verificados' => User::where('role', 'cliente')->whereNotNull('email_verified_at')->count(),
-                    'nuevos_periodo' => User::where('role', 'cliente')->whereBetween('created_at', [$from, $to])->count(),
-                    'con_paquetes' => User::where('role', 'cliente')->has('packages')->count(),
+                    'total' => User::customers()->count(),
+                    'verificados' => User::customers()->whereNotNull('email_verified_at')->count(),
+                    'nuevos_periodo' => User::customers()->whereBetween('created_at', [$from, $to])->count(),
+                    'con_paquetes' => User::customers()->has('packages')->count(),
                 ],
                 'staff' => [
                     'empleados' => User::where('role', 'empleado')->count(),
@@ -88,7 +88,7 @@ class AdminController extends Controller
                 'collected' => round((float) (clone $delivered)->sum('total'), 2),
                 'entregados' => (clone $delivered)->count(),
                 'registrados' => Package::whereBetween('received_at', [$from, $to])->count(),
-                'clientes_nuevos' => User::where('role', 'cliente')
+                'clientes_nuevos' => User::customers()
                     ->whereBetween('created_at', [$from, $to])
                     ->count(),
                 'peso_lb' => round((float) Package::whereBetween('received_at', [$from, $to])->sum('weight_lb'), 2),

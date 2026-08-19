@@ -55,15 +55,17 @@ class UserController extends Controller
             'identification_type' => ['nullable', Rule::in(['nacional', 'extranjero'])],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['cliente', 'empleado', 'admin'])],
+            // Los permisos y el casillero son cosas distintas: quien
+            // administra el negocio también compra.
+            'receives_packages' => ['nullable', 'boolean'],
         ]);
 
         $user = User::create([
-            ...$data,
+            ...collect($data)->except('receives_packages')->all(),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
             // Alta hecha por administración: el correo ya se da por bueno.
             'email_verified_at' => now(),
-            // Los clientes comparten el casillero de la operación.
-            'locker_code' => $data['role'] === 'cliente' ? config('tikabox.locker.code') : null,
+            'locker_code' => $this->lockerFor($data),
         ]);
 
         return response()->json(['data' => $this->present($user->loadCount('packages'))], 201);
@@ -81,21 +83,39 @@ class UserController extends Controller
             'identification' => ['nullable', 'string', 'max:30', Rule::unique('users', 'identification')->ignore($user->id)],
             'role' => ['required', Rule::in(['cliente', 'empleado', 'admin'])],
             'password' => ['nullable', 'string', 'min:8'],
+            'receives_packages' => ['nullable', 'boolean'],
         ]);
 
         $this->guardLastAdmin($request, $user, $data['role']);
 
         $user->update([
-            ...collect($data)->except('password')->all(),
+            ...collect($data)->except(['password', 'receives_packages'])->all(),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
-            // Al volverse cliente necesita casillero; al dejar de serlo, no.
-            'locker_code' => $data['role'] === 'cliente'
-                ? ($user->locker_code ?? config('tikabox.locker.code'))
-                : null,
+            'locker_code' => $this->lockerFor($data, $user),
             ...(filled($data['password'] ?? null) ? ['password' => $data['password']] : []),
         ]);
 
         return response()->json(['data' => $this->present($user->fresh()->loadCount('packages'))]);
+    }
+
+    /**
+     * El casillero que le toca a la cuenta.
+     *
+     * Un cliente siempre lo tiene; al personal se le da solo si además
+     * recibe paquetes. Es el mismo código para toda la operación.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function lockerFor(array $data, ?User $user = null): ?string
+    {
+        $wantsLocker = $data['role'] === 'cliente'
+            || filter_var($data['receives_packages'] ?? false, FILTER_VALIDATE_BOOL);
+
+        if (! $wantsLocker) {
+            return null;
+        }
+
+        return $user?->locker_code ?? config('tikabox.locker.code');
     }
 
     /**
@@ -136,6 +156,7 @@ class UserController extends Controller
             'identification_type' => $user->identification_type,
             'role' => $user->role,
             'locker_code' => $user->locker_code,
+            'receives_packages' => $user->isCustomer(),
             'packages_count' => $user->packages_count ?? 0,
             'email_verified' => $user->hasVerifiedEmail(),
             'created_at' => $user->created_at?->toDateString(),
