@@ -27,6 +27,7 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'locker_code' => $this->locker_code,
+            'role' => $this->role,
             'email_verified' => $this->hasVerifiedEmail(),
             'authorized_persons' => $this->whenLoaded(
                 'authorizedPersons',

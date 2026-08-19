@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Paquete recibido en el almacén y facturado al cliente. */
 #[Fillable([
@@ -45,6 +46,12 @@ class Package extends Model
     public function registeredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    /** @return HasMany<PackageEvent, $this> */
+    public function events(): HasMany
+    {
+        return $this->hasMany(PackageEvent::class)->oldest();
     }
 
     /** @return BelongsTo<Prealert, $this> */

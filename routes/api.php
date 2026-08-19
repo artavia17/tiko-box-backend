@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PrealertController;
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
@@ -87,6 +88,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/addresses/{address}', [AddressController::class, 'destroy']);
 
     // Prealertas
+    Route::get('/packages', [PackageController::class, 'index']);
+    Route::get('/packages/{package}', [PackageController::class, 'show']);
+
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);
     // La edición va por POST con _method=PUT: PHP no parsea multipart en PUT.

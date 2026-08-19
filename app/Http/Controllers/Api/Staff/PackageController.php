@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\Prealert;
+use App\Services\PackageTracker;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class PackageController extends Controller
      * saber de quién es la caja: el cliente se elige por id desde el buscador
      * de la app.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, PackageTracker $tracker): JsonResponse
     {
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
@@ -89,7 +90,7 @@ class PackageController extends Controller
                 'registered_by' => $request->user()->id,
                 'prealert_id' => $prealert?->id,
                 'tracking_number' => $tracking,
-                'courier' => $data['courier'] ?? $prealert?->courier,
+                'courier' => $data['courier'] ?? null,
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
                 'weight_lb' => $data['weight_lb'],
@@ -100,23 +101,35 @@ class PackageController extends Controller
             ]);
         });
 
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user());
+
         return response()->json([
-            'data' => $this->present($package->fresh()->load('user')),
+            'data' => $this->present($fresh),
         ], 201);
     }
 
-    public function updateStatus(Request $request, Package $package): JsonResponse
+    public function updateStatus(Request $request, Package $package, PackageTracker $tracker): JsonResponse
     {
         $data = $request->validate([
             'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo', 'entregado'])],
+            'note' => ['nullable', 'string', 'max:200'],
         ]);
+
+        // Sin cambio real no se avisa: nadie quiere el mismo correo dos veces.
+        if ($package->status === $data['status']) {
+            return response()->json(['data' => $this->present($package->load('user'))]);
+        }
 
         $package->update([
             'status' => $data['status'],
             'delivered_at' => $data['status'] === 'entregado' ? now() : null,
         ]);
 
-        return response()->json(['data' => $this->present($package->fresh()->load('user'))]);
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user(), $data['note'] ?? null);
+
+        return response()->json(['data' => $this->present($fresh)]);
     }
 
     public function destroy(Package $package): JsonResponse
