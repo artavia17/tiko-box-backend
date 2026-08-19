@@ -28,6 +28,9 @@ return [
 
     'price_per_pound' => (float) env('PRICE_PER_POUND', 6.5),
 
+    /** Nada se cobra por debajo de esto, aunque pese menos. */
+    'minimum_weight_lb' => (float) env('MINIMUM_WEIGHT_LB', 1),
+
     /*
     |--------------------------------------------------------------------------
     | Verificación de correo

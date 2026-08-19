@@ -96,6 +96,8 @@ class PackageController extends Controller
         }
 
         $pricePerPound = (float) config('tikabox.price_per_pound');
+        // Se cobra un mínimo aunque la caja pese menos.
+        $billable = max((float) $data['weight_lb'], (float) config('tikabox.minimum_weight_lb'));
 
         $package = DB::transaction(function () use ($customer, $data, $tracking, $pricePerPound, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
@@ -115,7 +117,7 @@ class PackageController extends Controller
                 'description' => $data['description'] ?? null,
                 'weight_lb' => $data['weight_lb'],
                 'price_per_pound' => $pricePerPound,
-                'total' => round($data['weight_lb'] * $pricePerPound, 2),
+                'total' => round($billable * $pricePerPound, 2),
                 'status' => 'recibido',
                 'received_at' => now(),
             ]);
