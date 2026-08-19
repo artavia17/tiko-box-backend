@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Package;
+use App\Models\PackagePhoto;
 use App\Models\Prealert;
 use App\Services\PackageTracker;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,8 @@ class PackageController extends Controller
     /** El cliente y su dirección: sin ella no se puede entregar el paquete. */
     private const CUSTOMER_RELATIONS = [
         'user',
+        'photos',
+        'events.createdBy',
         'user.defaultShippingAddress.province',
         'user.defaultShippingAddress.canton',
         'user.defaultShippingAddress.district',
@@ -68,10 +71,12 @@ class PackageController extends Controller
             'courier' => ['nullable', 'string', 'max:60'],
             'store' => ['nullable', 'string', 'max:60'],
             'description' => ['nullable', 'string', 'max:500'],
-            'photo' => ['nullable', File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
+            'photos' => ['nullable', 'array', 'max:8'],
+            'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
         ], [
-            'photo.mimes' => 'La foto debe ser PNG, JPG o WEBP.',
-            'photo.max' => 'La foto no puede pesar más de 8 MB.',
+            'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
+            'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
+            'photos.max' => 'Hasta 8 fotos por paquete.',
         ]);
 
         $customer = User::customers()->find($data['customer_id']);
@@ -108,10 +113,6 @@ class PackageController extends Controller
                 'courier' => $data['courier'] ?? null,
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
-                'photo_path' => $request->file('photo')?->store(
-                    "packages/{$customer->id}",
-                    'local',
-                ),
                 'weight_lb' => $data['weight_lb'],
                 'price_per_pound' => $pricePerPound,
                 'total' => round($data['weight_lb'] * $pricePerPound, 2),
@@ -119,6 +120,13 @@ class PackageController extends Controller
                 'received_at' => now(),
             ]);
         });
+
+        foreach ($request->file('photos') ?? [] as $photo) {
+            PackagePhoto::create([
+                'package_id' => $package->id,
+                'path' => $photo->store("packages/{$customer->id}", 'local'),
+            ]);
+        }
 
         $fresh = $package->fresh()->load(self::CUSTOMER_RELATIONS);
         $tracker->record($fresh, $request->user());
@@ -191,22 +199,22 @@ class PackageController extends Controller
         return response()->json(['data' => $this->present($fresh)]);
     }
 
-    /** La foto de la caja al llegar al almacén. */
-    public function photo(Request $request, Package $package): StreamedResponse
+    /** Una de las fotos de la caja al llegar al almacén. */
+    public function photo(Request $request, Package $package, PackagePhoto $photo): StreamedResponse
     {
         abort_unless(
             $package->user_id === $request->user()->id || $request->user()->isStaff(),
             404,
         );
 
-        abort_unless($package->photo_path, 404);
+        abort_unless($photo->package_id === $package->id, 404);
 
         $disk = Storage::disk('local');
-        abort_unless($disk->exists($package->photo_path), 404);
+        abort_unless($disk->exists($photo->path), 404);
 
         return $disk->response(
-            $package->photo_path,
-            'paquete-'.$package->tracking_number.'.'.pathinfo($package->photo_path, PATHINFO_EXTENSION),
+            $photo->path,
+            'paquete-'.$package->tracking_number.'.'.pathinfo($photo->path, PATHINFO_EXTENSION),
             ['Content-Disposition' => 'inline'],
         );
     }
@@ -303,7 +311,15 @@ class PackageController extends Controller
             'delivered_to_name' => $package->delivered_to_name,
             'delivered_to_identification' => $package->delivered_to_identification,
             'has_signature' => (bool) $package->signature_path,
-            'has_photo' => (bool) $package->photo_path,
+            'photos' => $package->photos->map(fn (PackagePhoto $photo) => ['id' => $photo->id]),
+            // Cada paso, con quién lo hizo: es el historial del paquete.
+            'events' => $package->events->map(fn ($event) => [
+                'id' => $event->id,
+                'status' => $event->status,
+                'note' => $event->note,
+                'at' => $event->created_at->toDateTimeString(),
+                'by' => $event->createdBy?->fullName(),
+            ]),
             'customer' => [
                 'id' => $package->user->id,
                 'locker_code' => $package->user->locker_code,

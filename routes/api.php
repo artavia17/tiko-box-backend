@@ -103,7 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/packages', [PackageController::class, 'index']);
     Route::get('/packages/{package}', [PackageController::class, 'show']);
     Route::get('/packages/{package}/signature', [StaffPackageController::class, 'signature']);
-    Route::get('/packages/{package}/photo', [StaffPackageController::class, 'photo']);
+    Route::get('/packages/{package}/photos/{photo}', [StaffPackageController::class, 'photo']);
 
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);
