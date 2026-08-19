@@ -45,35 +45,43 @@ class CustomerController extends Controller
         ]);
     }
 
+    /** Ficha completa: es lo que se consulta antes de entregar un paquete. */
     public function show(Request $request, User $customer): JsonResponse
     {
         abort_unless($customer->role === 'cliente', 404);
 
         $customer->load([
-            'defaultShippingAddress.province',
-            'defaultShippingAddress.canton',
-            'defaultShippingAddress.district',
+            'shippingAddresses.province',
+            'shippingAddresses.canton',
+            'shippingAddresses.district',
             'authorizedPersons',
         ]);
 
-        $address = $customer->defaultShippingAddress;
-
         return response()->json([
             'data' => [
-                ...$this->present($customer),
+                ...$this->present($customer->loadCount('packages')),
                 'identification_type' => $customer->identification_type,
                 'email_verified' => $customer->hasVerifiedEmail(),
                 'registered_at' => $customer->created_at->toDateString(),
-                'address' => $address ? [
-                    'province' => $address->province?->name,
-                    'canton' => $address->canton?->name,
-                    'district' => $address->district?->name,
-                    'exact_address' => $address->exact_address,
-                    'latitude' => $address->latitude,
-                    'longitude' => $address->longitude,
-                ] : null,
+                // Todas, con la principal marcada: el cliente puede tener
+                // varias y hay que saber a cuál va el paquete.
+                'addresses' => $customer->shippingAddresses
+                    ->sortByDesc('is_default')
+                    ->values()
+                    ->map(fn ($address) => [
+                        'id' => $address->id,
+                        'label' => $address->label,
+                        'province' => $address->province?->name,
+                        'canton' => $address->canton?->name,
+                        'district' => $address->district?->name,
+                        'exact_address' => $address->exact_address,
+                        'latitude' => $address->latitude,
+                        'longitude' => $address->longitude,
+                        'is_default' => (bool) $address->is_default,
+                    ]),
                 'authorized_persons' => $customer->authorizedPersons->map(fn ($person) => [
                     'name' => $person->name,
+                    'identification_type' => $person->identification_type,
                     'identification' => $person->identification,
                     'phone' => $person->phone,
                 ]),
