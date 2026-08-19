@@ -63,6 +63,7 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     Route::post('/packages', [StaffPackageController::class, 'store']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
     Route::post('/packages/{package}/deliver', [StaffPackageController::class, 'deliver']);
+    Route::patch('/packages/{package}/price', [StaffPackageController::class, 'adjustPrice']);
     Route::delete('/packages/{package}', [StaffPackageController::class, 'destroy']);
 });
 

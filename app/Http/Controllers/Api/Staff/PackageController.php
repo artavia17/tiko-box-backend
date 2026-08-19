@@ -25,6 +25,7 @@ class PackageController extends Controller
         'user',
         'photos',
         'events.createdBy',
+        'priceAdjustedBy',
         'user.defaultShippingAddress.province',
         'user.defaultShippingAddress.canton',
         'user.defaultShippingAddress.district',
@@ -201,6 +202,43 @@ class PackageController extends Controller
         return response()->json(['data' => $this->present($fresh)]);
     }
 
+    /**
+     * Precio especial para un cliente.
+     *
+     * El cobro por tarifa queda guardado aparte para saber cuánto se rebajó, y
+     * el ajuste anota quién lo hizo: es plata de la empresa.
+     */
+    public function adjustPrice(Request $request, Package $package): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403, 'Solo administración cambia el precio.');
+
+        $data = $request->validate([
+            'total' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'note' => ['required', 'string', 'max:200'],
+        ], [
+            'note.required' => 'Escribí por qué se le hace precio.',
+        ]);
+
+        if ($package->status === 'entregado') {
+            throw ValidationException::withMessages([
+                'total' => 'Este paquete ya se entregó y se cobró.',
+            ]);
+        }
+
+        $package->update([
+            // La primera vez se guarda lo que daba la tarifa; después no se pisa.
+            'original_total' => $package->original_total ?? $package->total,
+            'total' => round((float) $data['total'], 2),
+            'price_note' => $data['note'],
+            'price_adjusted_by' => $request->user()->id,
+            'price_adjusted_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => $this->present($package->fresh()->load(self::CUSTOMER_RELATIONS)),
+        ]);
+    }
+
     /** Una de las fotos de la caja al llegar al almacén. */
     public function photo(Request $request, Package $package, PackagePhoto $photo): StreamedResponse
     {
@@ -307,6 +345,9 @@ class PackageController extends Controller
             'weight_lb' => $package->weight_lb,
             'price_per_pound' => $package->price_per_pound,
             'total' => $package->total,
+            'original_total' => $package->original_total,
+            'price_note' => $package->price_note,
+            'price_adjusted_by' => $package->priceAdjustedBy?->fullName(),
             'status' => $package->status,
             'received_at' => $package->received_at?->toDateTimeString(),
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
