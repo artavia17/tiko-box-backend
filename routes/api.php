@@ -89,6 +89,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Prealertas
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);
+    // La edición va por POST con _method=PUT: PHP no parsea multipart en PUT.
     Route::put('/prealerts/{prealert}', [PrealertController::class, 'update']);
+    Route::get('/prealerts/{prealert}/invoice', [PrealertController::class, 'invoice']);
     Route::delete('/prealerts/{prealert}', [PrealertController::class, 'destroy']);
 });
