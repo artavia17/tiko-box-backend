@@ -101,7 +101,11 @@ class PrealertController extends Controller
      */
     public function invoice(Request $request, Prealert $prealert): StreamedResponse
     {
-        $this->authorizePrealert($request, $prealert);
+        // El personal la revisa al recibir la caja; el resto, solo la propia.
+        abort_unless(
+            $prealert->user_id === $request->user()->id || $request->user()->isStaff(),
+            404,
+        );
 
         abort_unless($prealert->invoice_path, 404);
 
