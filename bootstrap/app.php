@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Sin rutas web no hay a dónde redirigir: los invitados reciben 401 JSON.
         $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->alias(['staff' => \App\Http\Middleware\EnsureIsStaff::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Siempre JSON, incluso cuando el navegador pide HTML.

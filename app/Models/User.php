@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
     'name',
     'email',
     'password',
+    'role',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -55,25 +56,42 @@ class User extends Authenticatable
         ])));
     }
 
+    /** Personal del almacén y administradores. */
+    public function isStaff(): bool
+    {
+        return in_array($this->role, ['empleado', 'admin'], true);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
     /** @return HasMany<ShippingAddress, $this> */
     public function shippingAddresses(): HasMany
     {
         return $this->hasMany(ShippingAddress::class);
     }
 
-    /**  HasMany<AuthorizedPerson, $this> */
+    /** @return HasMany<AuthorizedPerson, $this> */
     public function authorizedPersons(): HasMany
     {
         return $this->hasMany(AuthorizedPerson::class);
     }
 
-    /**  HasMany<Prealert, $this> */
+    /** @return HasMany<Prealert, $this> */
     public function prealerts(): HasMany
     {
         return $this->hasMany(Prealert::class);
     }
 
-    /**  HasOne<ShippingAddress, $this> */
+    /** @return HasMany<Package, $this> */
+    public function packages(): HasMany
+    {
+        return $this->hasMany(Package::class);
+    }
+
+    /** @return HasOne<ShippingAddress, $this> */
     public function defaultShippingAddress(): HasOne
     {
         return $this->hasOne(ShippingAddress::class)->where('is_default', true);
