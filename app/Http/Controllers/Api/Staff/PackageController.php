@@ -41,13 +41,16 @@ class PackageController extends Controller
     }
 
     /**
-     * Registra un paquete recibido en Miami. Se identifica al cliente por su
-     * código de casillero, que es lo que viene escrito en la caja.
+     * Registra un paquete recibido en Miami.
+     *
+     * El casillero es el mismo para toda la operación, así que no sirve para
+     * saber de quién es la caja: el cliente se elige por id desde el buscador
+     * de la app.
      */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'locker_code' => ['required', 'string'],
+            'customer_id' => ['required', 'integer'],
             'tracking_number' => ['required', 'string', 'max:60'],
             'weight_lb' => ['required', 'numeric', 'min:0.1', 'max:500'],
             'courier' => ['nullable', 'string', 'max:60'],
@@ -55,13 +58,11 @@ class PackageController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $customer = User::where('role', 'cliente')
-            ->where('locker_code', strtoupper(trim($data['locker_code'])))
-            ->first();
+        $customer = User::where('role', 'cliente')->find($data['customer_id']);
 
         if (! $customer) {
             throw ValidationException::withMessages([
-                'locker_code' => 'No encontramos un cliente con ese código de casillero.',
+                'customer_id' => 'No encontramos ese cliente.',
             ]);
         }
 

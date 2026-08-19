@@ -7,16 +7,14 @@ return [
     | Casillero
     |--------------------------------------------------------------------------
     |
-    | Datos del almacén en Miami que se le entregan al cliente, y la
-    | configuración del código de casillero que se genera de forma
-    | incremental al registrarse (SJO0024956, SJO0024957, ...).
+    | Datos del almacén en Miami que se le entregan al cliente. El código de
+    | casillero es uno solo para toda la operación: es la suite que Tikabox
+    | tiene en el almacén, no un número por cliente.
     |
     */
 
     'locker' => [
-        'prefix' => env('LOCKER_PREFIX', 'SJO'),
-        'padding' => (int) env('LOCKER_PADDING', 7),
-        'start' => (int) env('LOCKER_START', 24955),
+        'code' => env('LOCKER_CODE', 'SJO0024955'),
     ],
 
     'warehouse' => [

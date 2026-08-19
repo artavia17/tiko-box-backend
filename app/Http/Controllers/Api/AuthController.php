@@ -8,7 +8,6 @@ use App\Http\Resources\UserResource;
 use App\Models\ShippingAddress;
 use App\Models\User;
 use App\Services\EmailVerificationService;
-use App\Services\LockerCodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,15 +21,15 @@ class AuthController extends Controller
     ) {}
 
     /**
-     * Registro: crea la cuenta, asigna el casillero, guarda la dirección de
-     * envío y manda el código de verificación. No entrega token todavía: la
-     * cuenta no sirve hasta confirmar el correo.
+     * Registro: crea la cuenta, guarda la dirección de envío y manda el
+     * código de verificación. No entrega token todavía: la cuenta no sirve
+     * hasta confirmar el correo.
      */
-    public function register(RegisterRequest $request, LockerCodeGenerator $lockers): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
 
-        $user = DB::transaction(function () use ($data, $lockers) {
+        $user = DB::transaction(function () use ($data) {
             $user = User::create([
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -38,7 +37,7 @@ class AuthController extends Controller
                 'identification_type' => $data['identification_type'],
                 'identification' => $data['identification'],
                 'phone' => $data['phone'],
-                'locker_code' => $lockers->next(),
+                'locker_code' => config('tikabox.locker.code'),
                 'name' => trim(implode(' ', array_filter([
                     $data['first_name'],
                     $data['last_name'],

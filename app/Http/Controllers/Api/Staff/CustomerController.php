@@ -27,7 +27,7 @@ class CustomerController extends Controller
                 });
             })
             ->withCount('packages')
-            ->orderBy('locker_code')
+            ->orderBy('name')
             ->paginate((int) $request->query('per_page', 20));
 
         return response()->json([
