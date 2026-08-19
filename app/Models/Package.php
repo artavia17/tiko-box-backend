@@ -22,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'status',
     'received_at',
     'delivered_at',
+    'delivered_to_name',
+    'delivered_to_identification',
+    'signature_path',
 ])]
 class Package extends Model
 {

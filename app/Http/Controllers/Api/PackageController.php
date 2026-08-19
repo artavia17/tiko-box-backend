@@ -64,6 +64,8 @@ class PackageController extends Controller
             'status_description' => PackageTracker::DESCRIPTIONS[$package->status] ?? null,
             'received_at' => $package->received_at?->toDateTimeString(),
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
+            'delivered_to_name' => $package->delivered_to_name,
+            'has_signature' => (bool) $package->signature_path,
             'events' => $package->events->map(fn (PackageEvent $event) => [
                 'id' => $event->id,
                 'status' => $event->status,

@@ -56,6 +56,7 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     Route::get('/packages', [StaffPackageController::class, 'index']);
     Route::post('/packages', [StaffPackageController::class, 'store']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
+    Route::post('/packages/{package}/deliver', [StaffPackageController::class, 'deliver']);
     Route::delete('/packages/{package}', [StaffPackageController::class, 'destroy']);
 });
 
@@ -90,6 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Prealertas
     Route::get('/packages', [PackageController::class, 'index']);
     Route::get('/packages/{package}', [PackageController::class, 'show']);
+    Route::get('/packages/{package}/signature', [StaffPackageController::class, 'signature']);
 
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);

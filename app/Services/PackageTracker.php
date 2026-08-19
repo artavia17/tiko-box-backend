@@ -22,7 +22,7 @@ class PackageTracker
         'recibido' => 'Llegó a nuestro almacén en Miami y ya está a tu nombre.',
         'en_transito' => 'Va camino a Costa Rica.',
         'listo' => 'Está en Costa Rica, listo para entregarte.',
-        'entregado' => 'Te lo entregamos. ¡Gracias por usar Tikabox!',
+        'entregado' => 'Te lo entregamos con la firma de quien lo recibió.',
     ];
 
     /**

@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\Prealert;
 use App\Services\PackageTracker;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\File;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -112,8 +115,11 @@ class PackageController extends Controller
     public function updateStatus(Request $request, Package $package, PackageTracker $tracker): JsonResponse
     {
         $data = $request->validate([
-            'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo', 'entregado'])],
+            // 'entregado' no entra acá: la entrega se firma, ver deliver().
+            'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo'])],
             'note' => ['nullable', 'string', 'max:200'],
+        ], [
+            'status.in' => 'Para entregar el paquete hay que registrar la firma de quien lo recibe.',
         ]);
 
         // Sin cambio real no se avisa: nadie quiere el mismo correo dos veces.
@@ -121,15 +127,73 @@ class PackageController extends Controller
             return response()->json(['data' => $this->present($package->load('user'))]);
         }
 
-        $package->update([
-            'status' => $data['status'],
-            'delivered_at' => $data['status'] === 'entregado' ? now() : null,
-        ]);
+        $package->update(['status' => $data['status'], 'delivered_at' => null]);
 
         $fresh = $package->fresh()->load('user');
         $tracker->record($fresh, $request->user(), $data['note'] ?? null);
 
         return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /**
+     * Entrega el paquete con constancia: quién lo recibió y su firma.
+     *
+     * La firma llega como imagen desde el panel; se guarda en el disco
+     * privado porque es un dato personal del cliente.
+     */
+    public function deliver(Request $request, Package $package, PackageTracker $tracker): JsonResponse
+    {
+        $data = $request->validate([
+            'delivered_to_name' => ['required', 'string', 'max:120'],
+            'delivered_to_identification' => ['nullable', 'string', 'max:30'],
+            'signature' => ['required', File::types(['png', 'jpg', 'jpeg'])->max(2048)],
+        ], [
+            'delivered_to_name.required' => 'Escribí el nombre de quien recibe.',
+            'signature.required' => 'Falta la firma de quien recibe.',
+        ]);
+
+        if ($package->status === 'entregado') {
+            throw ValidationException::withMessages([
+                'status' => 'Este paquete ya figura como entregado.',
+            ]);
+        }
+
+        $package->update([
+            'status' => 'entregado',
+            'delivered_at' => now(),
+            'delivered_to_name' => $data['delivered_to_name'],
+            'delivered_to_identification' => $data['delivered_to_identification'] ?? null,
+            'signature_path' => $request->file('signature')->store(
+                "signatures/{$package->user_id}",
+                'local',
+            ),
+        ]);
+
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user(), 'Recibido por '.$data['delivered_to_name']);
+
+        return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /** La firma guardada, para el comprobante. */
+    public function signature(Request $request, Package $package): StreamedResponse
+    {
+        // El dueño del paquete y el personal pueden verla; nadie más.
+        abort_unless(
+            $package->user_id === $request->user()->id || $request->user()->isStaff(),
+            404,
+        );
+
+        abort_unless($package->signature_path, 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($package->signature_path), 404);
+
+        return $disk->response(
+            $package->signature_path,
+            'firma-'.$package->tracking_number.'.png',
+            ['Content-Disposition' => 'inline'],
+        );
     }
 
     public function destroy(Package $package): JsonResponse
@@ -177,6 +241,9 @@ class PackageController extends Controller
             'status' => $package->status,
             'received_at' => $package->received_at?->toDateTimeString(),
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
+            'delivered_to_name' => $package->delivered_to_name,
+            'delivered_to_identification' => $package->delivered_to_identification,
+            'has_signature' => (bool) $package->signature_path,
             'customer' => [
                 'id' => $package->user->id,
                 'locker_code' => $package->user->locker_code,
