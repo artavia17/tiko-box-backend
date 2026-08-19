@@ -22,6 +22,8 @@ class StaffPrealertController extends Controller
         $dates = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
+            // Las que el cliente anunció sin decir cuándo llegan.
+            'undated' => ['nullable', 'boolean'],
         ]);
 
         $prealerts = Prealert::with('user')
@@ -33,11 +35,14 @@ class StaffPrealertController extends Controller
             })
             ->when(in_array($status, ['pendiente', 'recibido', 'en_transito', 'entregado'], true),
                 fn ($query) => $query->where('status', $status))
-            // Por fecha de aviso: es la única que siempre existe.
+            // Por el día en que el cliente dice que llega, que es lo que el
+            // almacén necesita saber para esperarlo.
+            ->when($dates['undated'] ?? false,
+                fn ($query) => $query->whereNull('expected_arrival'))
             ->when($dates['from'] ?? null,
-                fn ($query, $from) => $query->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
+                fn ($query, $from) => $query->whereDate('expected_arrival', '>=', Carbon::parse($from)))
             ->when($dates['to'] ?? null,
-                fn ($query, $to) => $query->where('created_at', '<=', Carbon::parse($to)->endOfDay()))
+                fn ($query, $to) => $query->whereDate('expected_arrival', '<=', Carbon::parse($to)))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 
@@ -48,6 +53,12 @@ class StaffPrealertController extends Controller
                 'last_page' => $prealerts->lastPage(),
                 'total' => $prealerts->total(),
                 'pendientes' => Prealert::where('status', 'pendiente')->count(),
+                'llegan_hoy' => Prealert::where('status', 'pendiente')
+                    ->whereDate('expected_arrival', today())
+                    ->count(),
+                'atrasadas' => Prealert::where('status', 'pendiente')
+                    ->whereDate('expected_arrival', '<', today())
+                    ->count(),
             ],
         ]);
     }
