@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Staff\AdminController;
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
+use App\Http\Controllers\Api\Staff\StaffPrealertController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,7 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
 
     // Paquetes
     Route::get('/summary', [StaffPackageController::class, 'summary']);
+    Route::get('/prealerts', [StaffPrealertController::class, 'index']);
     Route::get('/packages', [StaffPackageController::class, 'index']);
     Route::post('/packages', [StaffPackageController::class, 'store']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
