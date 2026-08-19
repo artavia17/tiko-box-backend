@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\LockerController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PrealertController;
+use App\Http\Controllers\Api\Staff\AdminController;
 use App\Http\Controllers\Api\Staff\CustomerController;
+use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use Illuminate\Support\Facades\Route;
@@ -62,8 +64,10 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
 
 // Gestión del personal: solo administradores.
 Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(function () {
-    Route::get('/users', [StaffAuthController::class, 'index']);
-    Route::post('/users', [StaffAuthController::class, 'store']);
+    Route::get('/stats', [AdminController::class, 'stats']);
+    Route::get('/users', [StaffUserController::class, 'index']);
+    Route::post('/users', [StaffUserController::class, 'store']);
+    Route::put('/users/{user}', [StaffUserController::class, 'update']);
 });
 
 /*
