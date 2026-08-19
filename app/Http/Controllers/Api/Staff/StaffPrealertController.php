@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Prealert;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * Las prealertas vistas desde el almacén: lo que los clientes avisaron que
@@ -18,6 +19,11 @@ class StaffPrealertController extends Controller
         $search = trim((string) $request->query('search'));
         $status = $request->query('status');
 
+        $dates = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
         $prealerts = Prealert::with('user')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
@@ -27,6 +33,11 @@ class StaffPrealertController extends Controller
             })
             ->when(in_array($status, ['pendiente', 'recibido', 'en_transito', 'entregado'], true),
                 fn ($query) => $query->where('status', $status))
+            // Por fecha de aviso: es la única que siempre existe.
+            ->when($dates['from'] ?? null,
+                fn ($query, $from) => $query->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
+            ->when($dates['to'] ?? null,
+                fn ($query, $to) => $query->where('created_at', '<=', Carbon::parse($to)->endOfDay()))
             ->latest()
             ->paginate((int) $request->query('per_page', 15));
 
