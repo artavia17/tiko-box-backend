@@ -85,6 +85,23 @@ class User extends Authenticatable
         return $this->hasMany(Prealert::class);
     }
 
+    /**
+     * Cliente es quien tiene casillero, sin importar sus permisos: el dueño
+     * del negocio también compra y recibe paquetes.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
+     */
+    public function scopeCustomers($query): void
+    {
+        $query->whereNotNull('locker_code');
+    }
+
+    /** ¿Tiene casillero para recibir paquetes? */
+    public function isCustomer(): bool
+    {
+        return $this->locker_code !== null;
+    }
+
     /** @return HasMany<Package, $this> */
     public function packages(): HasMany
     {

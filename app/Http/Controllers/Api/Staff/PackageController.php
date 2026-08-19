@@ -74,7 +74,7 @@ class PackageController extends Controller
             'photo.max' => 'La foto no puede pesar más de 8 MB.',
         ]);
 
-        $customer = User::where('role', 'cliente')->find($data['customer_id']);
+        $customer = User::customers()->find($data['customer_id']);
 
         if (! $customer) {
             throw ValidationException::withMessages([
@@ -257,7 +257,7 @@ class PackageController extends Controller
                     ->whereMonth('delivered_at', now()->month)
                     ->whereYear('delivered_at', now()->year)
                     ->count(),
-                'clientes' => User::where('role', 'cliente')->count(),
+                'clientes' => User::customers()->count(),
             ],
         ]);
     }
