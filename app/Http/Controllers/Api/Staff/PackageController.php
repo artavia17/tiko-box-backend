@@ -19,9 +19,17 @@ use Illuminate\Validation\ValidationException;
 /** Registro y seguimiento de paquetes desde el almacén. */
 class PackageController extends Controller
 {
+    /** El cliente y su dirección: sin ella no se puede entregar el paquete. */
+    private const CUSTOMER_RELATIONS = [
+        'user',
+        'user.defaultShippingAddress.province',
+        'user.defaultShippingAddress.canton',
+        'user.defaultShippingAddress.district',
+    ];
+
     public function index(Request $request): JsonResponse
     {
-        $packages = Package::with('user')
+        $packages = Package::with(self::CUSTOMER_RELATIONS)
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('tracking_number', 'like', "%{$search}%")
@@ -112,7 +120,7 @@ class PackageController extends Controller
             ]);
         });
 
-        $fresh = $package->fresh()->load('user');
+        $fresh = $package->fresh()->load(self::CUSTOMER_RELATIONS);
         $tracker->record($fresh, $request->user());
 
         return response()->json([
@@ -132,12 +140,12 @@ class PackageController extends Controller
 
         // Sin cambio real no se avisa: nadie quiere el mismo correo dos veces.
         if ($package->status === $data['status']) {
-            return response()->json(['data' => $this->present($package->load('user'))]);
+            return response()->json(['data' => $this->present($package->load(self::CUSTOMER_RELATIONS))]);
         }
 
         $package->update(['status' => $data['status'], 'delivered_at' => null]);
 
-        $fresh = $package->fresh()->load('user');
+        $fresh = $package->fresh()->load(self::CUSTOMER_RELATIONS);
         $tracker->record($fresh, $request->user(), $data['note'] ?? null);
 
         return response()->json(['data' => $this->present($fresh)]);
@@ -177,7 +185,7 @@ class PackageController extends Controller
             ),
         ]);
 
-        $fresh = $package->fresh()->load('user');
+        $fresh = $package->fresh()->load(self::CUSTOMER_RELATIONS);
         $tracker->record($fresh, $request->user(), 'Recibido por '.$data['delivered_to_name']);
 
         return response()->json(['data' => $this->present($fresh)]);
@@ -254,6 +262,29 @@ class PackageController extends Controller
         ]);
     }
 
+    /**
+     * A dónde hay que llevarle el paquete.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function address(User $customer): ?array
+    {
+        $address = $customer->defaultShippingAddress;
+
+        if (! $address) {
+            return null;
+        }
+
+        return [
+            'province' => $address->province?->name,
+            'canton' => $address->canton?->name,
+            'district' => $address->district?->name,
+            'exact_address' => $address->exact_address,
+            'latitude' => $address->latitude,
+            'longitude' => $address->longitude,
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function present(Package $package): array
     {
@@ -278,6 +309,7 @@ class PackageController extends Controller
                 'locker_code' => $package->user->locker_code,
                 'full_name' => $package->user->fullName(),
                 'phone' => $package->user->phone,
+                'address' => $this->address($package->user),
             ],
         ];
     }
