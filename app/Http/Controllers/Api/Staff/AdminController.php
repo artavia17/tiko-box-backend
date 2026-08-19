@@ -72,6 +72,56 @@ class AdminController extends Controller
     }
 
     /**
+     * Lo que pasó hoy: es lo primero que quiere ver quien administra al
+     * entrar por la mañana.
+     */
+    public function today(): JsonResponse
+    {
+        $from = now()->startOfDay();
+        $to = now()->endOfDay();
+
+        $delivered = Package::where('status', 'entregado')->whereBetween('delivered_at', [$from, $to]);
+
+        return response()->json([
+            'data' => [
+                'date' => now()->toDateString(),
+                'collected' => round((float) (clone $delivered)->sum('total'), 2),
+                'entregados' => (clone $delivered)->count(),
+                'registrados' => Package::whereBetween('received_at', [$from, $to])->count(),
+                'clientes_nuevos' => User::where('role', 'cliente')
+                    ->whereBetween('created_at', [$from, $to])
+                    ->count(),
+                'peso_lb' => round((float) Package::whereBetween('received_at', [$from, $to])->sum('weight_lb'), 2),
+                'series' => $this->lastDays(7),
+            ],
+        ]);
+    }
+
+    /**
+     * Ingresos de los últimos días, con hoy al final: un solo día no dibuja
+     * una tendencia.
+     *
+     * @return list<array{label: string, revenue: float, packages: int}>
+     */
+    private function lastDays(int $days): array
+    {
+        $names = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+
+        return array_map(function (int $back) use ($names) {
+            $day = now()->subDays($back);
+
+            $delivered = Package::where('status', 'entregado')
+                ->whereBetween('delivered_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()]);
+
+            return [
+                'label' => $names[$day->dayOfWeek].' '.$day->day,
+                'revenue' => round((float) (clone $delivered)->sum('total'), 2),
+                'packages' => (clone $delivered)->count(),
+            ];
+        }, range($days - 1, 0));
+    }
+
+    /**
      * Serie para el gráfico: por mes si se mira un año, por día si se mira
      * un mes.
      *
