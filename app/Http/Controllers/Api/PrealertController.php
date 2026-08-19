@@ -4,20 +4,26 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Prealert;
-use App\Models\PrealertItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PrealertController extends Controller
 {
+    /** Únicos formatos aceptados para la factura. */
+    private const INVOICE_TYPES = ['pdf', 'png', 'webp', 'jpg', 'jpeg'];
+
+    private const INVOICE_MAX_KB = 8192;
+
     public function index(Request $request): JsonResponse
     {
         $prealerts = $request->user()
             ->prealerts()
-            ->with('items')
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where('tracking_number', 'like', "%{$search}%");
             })
@@ -39,29 +45,16 @@ class PrealertController extends Controller
     {
         $data = $this->validated($request);
 
-        $prealert = DB::transaction(function () use ($request, $data) {
-            $prealert = Prealert::create([
-                'user_id' => $request->user()->id,
-                'tracking_number' => strtoupper($data['tracking_number']),
-                'origin' => $data['origin'],
-                'courier' => $data['courier'] ?? null,
-                'currency' => $data['currency'],
-                'expected_arrival' => $data['expected_arrival'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
-
-            foreach ($data['items'] as $item) {
-                PrealertItem::create(['prealert_id' => $prealert->id, ...$item]);
-            }
-
-            return $prealert;
-        });
+        $prealert = Prealert::create([
+            'user_id' => $request->user()->id,
+            'tracking_number' => strtoupper($data['tracking_number']),
+            'invoice_path' => $this->storeInvoice($request->file('invoice'), $request->user()->id),
+            'origin' => $data['origin'] ?? 'Miami',
+            'expected_arrival' => $data['expected_arrival'] ?? null,
+        ]);
 
         // fresh() para traer el estado por defecto que pone la base de datos.
-        return response()->json(
-            ['data' => $this->present($prealert->fresh()->load('items'))],
-            201,
-        );
+        return response()->json(['data' => $this->present($prealert->fresh())], 201);
     }
 
     public function update(Request $request, Prealert $prealert): JsonResponse
@@ -71,27 +64,21 @@ class PrealertController extends Controller
 
         $data = $this->validated($request, $prealert);
 
-        DB::transaction(function () use ($prealert, $data) {
-            $prealert->update([
-                'tracking_number' => strtoupper($data['tracking_number']),
-                'origin' => $data['origin'],
-                'courier' => $data['courier'] ?? null,
-                'currency' => $data['currency'],
-                'expected_arrival' => $data['expected_arrival'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
+        $invoice = $request->file('invoice');
+        $previous = $prealert->invoice_path;
 
-            // Los artículos se reemplazan por completo.
-            $prealert->items()->delete();
-
-            foreach ($data['items'] as $item) {
-                PrealertItem::create(['prealert_id' => $prealert->id, ...$item]);
-            }
-        });
-
-        return response()->json([
-            'data' => $this->present($prealert->fresh()->load('items')),
+        $prealert->update([
+            'tracking_number' => strtoupper($data['tracking_number']),
+            'expected_arrival' => $data['expected_arrival'] ?? null,
+            // Si no mandan una factura nueva, se conserva la que ya estaba.
+            ...($invoice ? ['invoice_path' => $this->storeInvoice($invoice, $prealert->user_id)] : []),
         ]);
+
+        if ($invoice && $previous) {
+            Storage::disk('local')->delete($previous);
+        }
+
+        return response()->json(['data' => $this->present($prealert->fresh())]);
     }
 
     public function destroy(Request $request, Prealert $prealert): JsonResponse
@@ -99,9 +86,39 @@ class PrealertController extends Controller
         $this->authorizePrealert($request, $prealert);
         $this->ensureEditable($prealert);
 
+        if ($prealert->invoice_path) {
+            Storage::disk('local')->delete($prealert->invoice_path);
+        }
+
         $prealert->delete();
 
         return response()->json(['message' => 'Prealerta eliminada.']);
+    }
+
+    /**
+     * Entrega la factura. Va por acá y no por una URL pública porque el
+     * archivo trae los datos de compra del cliente.
+     */
+    public function invoice(Request $request, Prealert $prealert): StreamedResponse
+    {
+        $this->authorizePrealert($request, $prealert);
+
+        abort_unless($prealert->invoice_path, 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($prealert->invoice_path), 404);
+
+        return $disk->response(
+            $prealert->invoice_path,
+            'factura-'.$prealert->tracking_number.'.'.pathinfo($prealert->invoice_path, PATHINFO_EXTENSION),
+            ['Content-Disposition' => 'inline'],
+        );
+    }
+
+    /** Guarda la factura fuera del disco público, separada por cliente. */
+    private function storeInvoice(UploadedFile $file, int $userId): string
+    {
+        return $file->store("invoices/{$userId}", 'local');
     }
 
     private function authorizePrealert(Request $request, Prealert $prealert): void
@@ -125,6 +142,12 @@ class PrealertController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, ?Prealert $prealert = null): array
     {
+        // Al editar, la factura solo se valida si mandan una nueva.
+        $invoiceRules = [
+            $prealert ? 'nullable' : 'required',
+            File::types(self::INVOICE_TYPES)->max(self::INVOICE_MAX_KB),
+        ];
+
         return $request->validate([
             'tracking_number' => [
                 'required',
@@ -134,19 +157,14 @@ class PrealertController extends Controller
                     ->where('user_id', $request->user()->id)
                     ->ignore($prealert?->id),
             ],
-            'origin' => ['required', 'string', 'max:60'],
-            'courier' => ['nullable', 'string', 'max:60'],
-            'currency' => ['required', Rule::in(['USD', 'CRC'])],
+            'invoice' => $invoiceRules,
+            'origin' => ['nullable', 'string', 'max:60'],
             'expected_arrival' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string', 'max:500'],
-
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.description' => ['required', 'string', 'max:200'],
-            'items.*.price' => ['required', 'numeric', 'min:0'],
         ], [
             'tracking_number.unique' => 'Ya tenés una prealerta con ese número de rastreo.',
-            'items.required' => 'Agregá al menos un artículo.',
+            'invoice.required' => 'Subí la factura de la compra.',
+            'invoice.mimes' => 'La factura debe ser un PDF o una imagen PNG, WEBP o JPG.',
+            'invoice.max' => 'La factura no puede pesar más de 8 MB.',
         ]);
     }
 
@@ -157,19 +175,13 @@ class PrealertController extends Controller
             'id' => $prealert->id,
             'tracking_number' => $prealert->tracking_number,
             'origin' => $prealert->origin,
-            'courier' => $prealert->courier,
-            'currency' => $prealert->currency,
             'expected_arrival' => $prealert->expected_arrival?->toDateString(),
             'status' => $prealert->status,
-            'notes' => $prealert->notes,
-            'declared_value' => $prealert->declaredValue(),
+            'has_invoice' => (bool) $prealert->invoice_path,
+            'invoice_type' => $prealert->invoice_path
+                ? strtolower(pathinfo($prealert->invoice_path, PATHINFO_EXTENSION))
+                : null,
             'created_at' => $prealert->created_at->toDateString(),
-            'items' => $prealert->items->map(fn (PrealertItem $item) => [
-                'id' => $item->id,
-                'quantity' => $item->quantity,
-                'description' => $item->description,
-                'price' => $item->price,
-            ]),
         ];
     }
 }

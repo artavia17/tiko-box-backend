@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\Prealert;
+use App\Services\PackageTracker;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\File;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +51,7 @@ class PackageController extends Controller
      * saber de quién es la caja: el cliente se elige por id desde el buscador
      * de la app.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, PackageTracker $tracker): JsonResponse
     {
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
@@ -56,6 +60,10 @@ class PackageController extends Controller
             'courier' => ['nullable', 'string', 'max:60'],
             'store' => ['nullable', 'string', 'max:60'],
             'description' => ['nullable', 'string', 'max:500'],
+            'photo' => ['nullable', File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
+        ], [
+            'photo.mimes' => 'La foto debe ser PNG, JPG o WEBP.',
+            'photo.max' => 'La foto no puede pesar más de 8 MB.',
         ]);
 
         $customer = User::where('role', 'cliente')->find($data['customer_id']);
@@ -89,9 +97,13 @@ class PackageController extends Controller
                 'registered_by' => $request->user()->id,
                 'prealert_id' => $prealert?->id,
                 'tracking_number' => $tracking,
-                'courier' => $data['courier'] ?? $prealert?->courier,
+                'courier' => $data['courier'] ?? null,
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
+                'photo_path' => $request->file('photo')?->store(
+                    "packages/{$customer->id}",
+                    'local',
+                ),
                 'weight_lb' => $data['weight_lb'],
                 'price_per_pound' => $pricePerPound,
                 'total' => round($data['weight_lb'] * $pricePerPound, 2),
@@ -100,23 +112,116 @@ class PackageController extends Controller
             ]);
         });
 
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user());
+
         return response()->json([
-            'data' => $this->present($package->fresh()->load('user')),
+            'data' => $this->present($fresh),
         ], 201);
     }
 
-    public function updateStatus(Request $request, Package $package): JsonResponse
+    public function updateStatus(Request $request, Package $package, PackageTracker $tracker): JsonResponse
     {
         $data = $request->validate([
-            'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo', 'entregado'])],
+            // 'entregado' no entra acá: la entrega se firma, ver deliver().
+            'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo'])],
+            'note' => ['nullable', 'string', 'max:200'],
+        ], [
+            'status.in' => 'Para entregar el paquete hay que registrar la firma de quien lo recibe.',
         ]);
+
+        // Sin cambio real no se avisa: nadie quiere el mismo correo dos veces.
+        if ($package->status === $data['status']) {
+            return response()->json(['data' => $this->present($package->load('user'))]);
+        }
+
+        $package->update(['status' => $data['status'], 'delivered_at' => null]);
+
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user(), $data['note'] ?? null);
+
+        return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /**
+     * Entrega el paquete con constancia: quién lo recibió y su firma.
+     *
+     * La firma llega como imagen desde el panel; se guarda en el disco
+     * privado porque es un dato personal del cliente.
+     */
+    public function deliver(Request $request, Package $package, PackageTracker $tracker): JsonResponse
+    {
+        $data = $request->validate([
+            'delivered_to_name' => ['required', 'string', 'max:120'],
+            'delivered_to_identification' => ['nullable', 'string', 'max:30'],
+            'signature' => ['required', File::types(['png', 'jpg', 'jpeg'])->max(2048)],
+        ], [
+            'delivered_to_name.required' => 'Escribí el nombre de quien recibe.',
+            'signature.required' => 'Falta la firma de quien recibe.',
+        ]);
+
+        if ($package->status === 'entregado') {
+            throw ValidationException::withMessages([
+                'status' => 'Este paquete ya figura como entregado.',
+            ]);
+        }
 
         $package->update([
-            'status' => $data['status'],
-            'delivered_at' => $data['status'] === 'entregado' ? now() : null,
+            'status' => 'entregado',
+            'delivered_at' => now(),
+            'delivered_to_name' => $data['delivered_to_name'],
+            'delivered_to_identification' => $data['delivered_to_identification'] ?? null,
+            'signature_path' => $request->file('signature')->store(
+                "signatures/{$package->user_id}",
+                'local',
+            ),
         ]);
 
-        return response()->json(['data' => $this->present($package->fresh()->load('user'))]);
+        $fresh = $package->fresh()->load('user');
+        $tracker->record($fresh, $request->user(), 'Recibido por '.$data['delivered_to_name']);
+
+        return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /** La foto de la caja al llegar al almacén. */
+    public function photo(Request $request, Package $package): StreamedResponse
+    {
+        abort_unless(
+            $package->user_id === $request->user()->id || $request->user()->isStaff(),
+            404,
+        );
+
+        abort_unless($package->photo_path, 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($package->photo_path), 404);
+
+        return $disk->response(
+            $package->photo_path,
+            'paquete-'.$package->tracking_number.'.'.pathinfo($package->photo_path, PATHINFO_EXTENSION),
+            ['Content-Disposition' => 'inline'],
+        );
+    }
+
+    /** La firma guardada, para el comprobante. */
+    public function signature(Request $request, Package $package): StreamedResponse
+    {
+        // El dueño del paquete y el personal pueden verla; nadie más.
+        abort_unless(
+            $package->user_id === $request->user()->id || $request->user()->isStaff(),
+            404,
+        );
+
+        abort_unless($package->signature_path, 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($package->signature_path), 404);
+
+        return $disk->response(
+            $package->signature_path,
+            'firma-'.$package->tracking_number.'.png',
+            ['Content-Disposition' => 'inline'],
+        );
     }
 
     public function destroy(Package $package): JsonResponse
@@ -164,6 +269,10 @@ class PackageController extends Controller
             'status' => $package->status,
             'received_at' => $package->received_at?->toDateTimeString(),
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
+            'delivered_to_name' => $package->delivered_to_name,
+            'delivered_to_identification' => $package->delivered_to_identification,
+            'has_signature' => (bool) $package->signature_path,
+            'has_photo' => (bool) $package->photo_path,
             'customer' => [
                 'id' => $package->user->id,
                 'locker_code' => $package->user->locker_code,

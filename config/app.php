@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sitio del cliente
+    |--------------------------------------------------------------------------
+    |
+    | A dónde apuntan los enlaces de los correos: el backend es solo API, así
+    | que las pantallas viven en otro dominio.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

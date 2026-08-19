@@ -163,8 +163,12 @@ class AuthController extends Controller
 
     private function tokenResponse(User $user): JsonResponse
     {
+        // El personal entra por el mismo login que los clientes: su token
+        // lleva la habilidad que abre las rutas del almacén.
+        $abilities = $user->isStaff() ? ['staff'] : ['*'];
+
         return response()->json([
-            'token' => $user->createToken('tikabox')->plainTextToken,
+            'token' => $user->createToken('tikabox', $abilities)->plainTextToken,
             'user' => new UserResource($this->withRelations($user)),
         ]);
     }

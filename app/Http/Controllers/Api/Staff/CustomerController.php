@@ -18,6 +18,11 @@ class CustomerController extends Controller
     {
         $search = trim((string) $request->query('search'));
 
+        // El empleado busca al dueño de una caja concreta; recorrer el
+        // directorio entero de clientes es cosa de administración.
+        abort_if($search === '' && ! $request->user()->isAdmin(), 403,
+            'Buscá al cliente por nombre, cédula o correo.');
+
         $customers = User::where('role', 'cliente')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
