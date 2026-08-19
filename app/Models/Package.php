@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'courier',
     'store',
     'description',
+    'photo_path',
     'weight_lb',
     'price_per_pound',
     'total',

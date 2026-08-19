@@ -66,6 +66,7 @@ class PackageController extends Controller
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
             'delivered_to_name' => $package->delivered_to_name,
             'has_signature' => (bool) $package->signature_path,
+            'has_photo' => (bool) $package->photo_path,
             'events' => $package->events->map(fn (PackageEvent $event) => [
                 'id' => $event->id,
                 'status' => $event->status,
