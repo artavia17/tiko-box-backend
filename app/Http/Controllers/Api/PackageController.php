@@ -23,6 +23,13 @@ class PackageController extends Controller
             ->when($request->query('status'), function ($query, string $status) {
                 $query->where('status', $status);
             })
+            // Por el punto del recorrido: primero lo que llegó a Miami y
+            // último lo entregado, que ya no requiere nada del cliente.
+            ->orderByRaw("CASE status
+                WHEN 'recibido' THEN 1
+                WHEN 'en_transito' THEN 2
+                WHEN 'listo' THEN 3
+                ELSE 4 END")
             ->latest('received_at')
             ->paginate((int) $request->query('per_page', 10));
 
