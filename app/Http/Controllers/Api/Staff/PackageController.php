@@ -34,14 +34,25 @@ class PackageController extends Controller
     public function index(Request $request): JsonResponse
     {
         $packages = Package::with(self::CUSTOMER_RELATIONS)
+            // El casillero es el mismo para todos, así que no sirve para
+            // buscar: se identifica al cliente por sus datos.
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('tracking_number', 'like', "%{$search}%")
-                        ->orWhereHas('user', fn ($u) => $u
-                            ->where('locker_code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%"));
+                        // Los OR van agrupados: sueltos se mezclarían con la
+                        // correlación de la subconsulta y traerían todo.
+                        ->orWhereHas('user', function ($u) use ($search) {
+                            $u->where(function ($inner) use ($search) {
+                                foreach (['name', 'email', 'identification', 'phone'] as $field) {
+                                    $inner->orWhere($field, 'like', "%{$search}%");
+                                }
+                            });
+                        });
                 });
             })
+            // Desde la ficha de un cliente se llega con su id, que no depende
+            // de cómo esté escrito su nombre.
+            ->when($request->query('customer'), fn ($query, $id) => $query->where('user_id', $id))
             ->when($request->query('status'), fn ($query, string $status) => $query->where('status', $status))
             ->latest()
             ->paginate((int) $request->query('per_page', 20));
