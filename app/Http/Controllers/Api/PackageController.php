@@ -33,10 +33,14 @@ class PackageController extends Controller
                 'last_page' => $packages->lastPage(),
                 'total' => $packages->total(),
                 'per_page' => $packages->perPage(),
-                // Para los totales de la cabecera sin pedir otra página.
+                // Sobre todos los paquetes, no solo los de esta página: lo que
+                // se debe no depende de cuántos quepan en pantalla.
                 'pending_total' => (float) $request->user()->packages()
                     ->where('status', '!=', 'entregado')
                     ->sum('total'),
+                'pending_count' => $request->user()->packages()
+                    ->where('status', '!=', 'entregado')
+                    ->count(),
             ],
         ]);
     }
