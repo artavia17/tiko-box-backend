@@ -17,8 +17,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'store',
     'description',
     'weight_lb',
+    'exact_weight',
     'price_per_pound',
     'total',
+    'original_total',
+    'price_note',
+    'price_adjusted_by',
+    'price_adjusted_at',
     'status',
     'received_at',
     'delivered_at',
@@ -32,8 +37,11 @@ class Package extends Model
     {
         return [
             'weight_lb' => 'float',
+            'exact_weight' => 'boolean',
             'price_per_pound' => 'float',
             'total' => 'float',
+            'original_total' => 'float',
+            'price_adjusted_at' => 'datetime',
             'received_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];
@@ -61,6 +69,12 @@ class Package extends Model
     public function events(): HasMany
     {
         return $this->hasMany(PackageEvent::class)->oldest();
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function priceAdjustedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'price_adjusted_by');
     }
 
     /** @return BelongsTo<Prealert, $this> */

@@ -48,6 +48,28 @@ class PackageController extends Controller
         return response()->json(['data' => $this->present($package->load(['events', 'photos']))]);
     }
 
+    /**
+     * Lo que se le rebajó al cliente, si se le rebajó algo.
+     *
+     * @return array<string, mixed>
+     */
+    private function discount(Package $package): array
+    {
+        $listed = (float) $package->original_total;
+
+        if (! $package->original_total || $listed <= (float) $package->total) {
+            return [];
+        }
+
+        $saved = $listed - (float) $package->total;
+
+        return [
+            'original_total' => round($listed, 2),
+            'discount' => round($saved, 2),
+            'discount_percent' => (int) round($saved / $listed * 100),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function present(Package $package): array
     {
@@ -60,6 +82,9 @@ class PackageController extends Controller
             'weight_lb' => $package->weight_lb,
             'price_per_pound' => $package->price_per_pound,
             'total' => $package->total,
+            // Solo se le cuenta al cliente cuando salió ganando: si el monto
+            // subió, el dato ni siquiera sale del servidor.
+            ...$this->discount($package),
             'status' => $package->status,
             'status_description' => PackageTracker::DESCRIPTIONS[$package->status] ?? null,
             'received_at' => $package->received_at?->toDateTimeString(),

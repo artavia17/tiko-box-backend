@@ -25,6 +25,7 @@ class PackageController extends Controller
         'user',
         'photos',
         'events.createdBy',
+        'priceAdjustedBy',
         'user.defaultShippingAddress.province',
         'user.defaultShippingAddress.canton',
         'user.defaultShippingAddress.district',
@@ -67,7 +68,9 @@ class PackageController extends Controller
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
             'tracking_number' => ['required', 'string', 'max:60'],
-            'weight_lb' => ['required', 'numeric', 'min:0.1', 'max:500'],
+            'weight_lb' => ['required', 'numeric', 'min:0.01', 'max:500'],
+            // Envío consolidado: se cobra el peso tal cual, sin el mínimo.
+            'exact_weight' => ['nullable', 'boolean'],
             'courier' => ['nullable', 'string', 'max:60'],
             'store' => ['nullable', 'string', 'max:60'],
             'description' => ['nullable', 'string', 'max:500'],
@@ -95,9 +98,17 @@ class PackageController extends Controller
             ]);
         }
 
+        $weight = round((float) $data['weight_lb'], 2);
+        $exact = filter_var($data['exact_weight'] ?? false, FILTER_VALIDATE_BOOL);
+
         $pricePerPound = (float) config('tikabox.price_per_pound');
 
-        $package = DB::transaction(function () use ($customer, $data, $tracking, $pricePerPound, $request) {
+        // Se cobra un mínimo aunque pese menos, salvo que se pida lo exacto.
+        $billable = $exact
+            ? $weight
+            : max($weight, (float) config('tikabox.minimum_weight_lb'));
+
+        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $billable, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
             $prealert = Prealert::where('user_id', $customer->id)
                 ->where('tracking_number', $tracking)
@@ -113,9 +124,10 @@ class PackageController extends Controller
                 'courier' => $data['courier'] ?? null,
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
-                'weight_lb' => $data['weight_lb'],
+                'weight_lb' => $weight,
+                'exact_weight' => $exact,
                 'price_per_pound' => $pricePerPound,
-                'total' => round($data['weight_lb'] * $pricePerPound, 2),
+                'total' => round($billable * $pricePerPound, 2),
                 'status' => 'recibido',
                 'received_at' => now(),
             ]);
@@ -197,6 +209,43 @@ class PackageController extends Controller
         $tracker->record($fresh, $request->user(), 'Recibido por '.$data['delivered_to_name']);
 
         return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /**
+     * Precio especial para un cliente.
+     *
+     * El cobro por tarifa queda guardado aparte para saber cuánto se rebajó, y
+     * el ajuste anota quién lo hizo: es plata de la empresa.
+     */
+    public function adjustPrice(Request $request, Package $package): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403, 'Solo administración cambia el precio.');
+
+        $data = $request->validate([
+            'total' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'note' => ['required', 'string', 'max:200'],
+        ], [
+            'note.required' => 'Escribí por qué se le hace precio.',
+        ]);
+
+        if ($package->status === 'entregado') {
+            throw ValidationException::withMessages([
+                'total' => 'Este paquete ya se entregó y se cobró.',
+            ]);
+        }
+
+        $package->update([
+            // La primera vez se guarda lo que daba la tarifa; después no se pisa.
+            'original_total' => $package->original_total ?? $package->total,
+            'total' => round((float) $data['total'], 2),
+            'price_note' => $data['note'],
+            'price_adjusted_by' => $request->user()->id,
+            'price_adjusted_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => $this->present($package->fresh()->load(self::CUSTOMER_RELATIONS)),
+        ]);
     }
 
     /** Una de las fotos de la caja al llegar al almacén. */
@@ -303,8 +352,12 @@ class PackageController extends Controller
             'store' => $package->store,
             'description' => $package->description,
             'weight_lb' => $package->weight_lb,
+            'exact_weight' => $package->exact_weight,
             'price_per_pound' => $package->price_per_pound,
             'total' => $package->total,
+            'original_total' => $package->original_total,
+            'price_note' => $package->price_note,
+            'price_adjusted_by' => $package->priceAdjustedBy?->fullName(),
             'status' => $package->status,
             'received_at' => $package->received_at?->toDateTimeString(),
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
