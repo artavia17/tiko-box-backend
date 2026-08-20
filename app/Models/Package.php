@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'store',
     'description',
     'weight_lb',
+    'weight_breakdown',
+    'exact_weight',
     'price_per_pound',
     'total',
     'original_total',
@@ -36,6 +38,8 @@ class Package extends Model
     {
         return [
             'weight_lb' => 'float',
+            'weight_breakdown' => 'array',
+            'exact_weight' => 'boolean',
             'price_per_pound' => 'float',
             'total' => 'float',
             'original_total' => 'float',
