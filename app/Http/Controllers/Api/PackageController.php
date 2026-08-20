@@ -80,7 +80,6 @@ class PackageController extends Controller
             'store' => $package->store,
             'description' => $package->description,
             'weight_lb' => $package->weight_lb,
-            'weight_breakdown' => $package->weight_breakdown,
             'price_per_pound' => $package->price_per_pound,
             'total' => $package->total,
             // Solo se le cuenta al cliente cuando salió ganando: si el monto

@@ -68,11 +68,8 @@ class PackageController extends Controller
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
             'tracking_number' => ['required', 'string', 'max:60'],
-            // Un solo bulto, o varios que se suman en un mismo envío.
-            'weight_lb' => ['required_without:weights', 'nullable', 'numeric', 'min:0.01', 'max:500'],
-            'weights' => ['required_without:weight_lb', 'nullable', 'array', 'min:1', 'max:30'],
-            'weights.*' => ['numeric', 'min:0.01', 'max:500'],
-            // Cobrar el peso tal cual, sin el mínimo de una libra.
+            'weight_lb' => ['required', 'numeric', 'min:0.01', 'max:500'],
+            // Envío consolidado: se cobra el peso tal cual, sin el mínimo.
             'exact_weight' => ['nullable', 'boolean'],
             'courier' => ['nullable', 'string', 'max:60'],
             'store' => ['nullable', 'string', 'max:60'],
@@ -101,12 +98,7 @@ class PackageController extends Controller
             ]);
         }
 
-        $weights = collect($data['weights'] ?? [$data['weight_lb']])
-            ->map(fn ($weight) => round((float) $weight, 2))
-            ->filter()
-            ->values();
-
-        $weight = round((float) $weights->sum(), 2);
+        $weight = round((float) $data['weight_lb'], 2);
         $exact = filter_var($data['exact_weight'] ?? false, FILTER_VALIDATE_BOOL);
 
         $pricePerPound = (float) config('tikabox.price_per_pound');
@@ -116,7 +108,7 @@ class PackageController extends Controller
             ? $weight
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
-        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $weights, $exact, $pricePerPound, $billable, $request) {
+        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $billable, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
             $prealert = Prealert::where('user_id', $customer->id)
                 ->where('tracking_number', $tracking)
@@ -133,8 +125,6 @@ class PackageController extends Controller
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
                 'weight_lb' => $weight,
-                // Solo tiene sentido guardarlo si vino más de un bulto.
-                'weight_breakdown' => $weights->count() > 1 ? $weights->all() : null,
                 'exact_weight' => $exact,
                 'price_per_pound' => $pricePerPound,
                 'total' => round($billable * $pricePerPound, 2),
@@ -362,7 +352,6 @@ class PackageController extends Controller
             'store' => $package->store,
             'description' => $package->description,
             'weight_lb' => $package->weight_lb,
-            'weight_breakdown' => $package->weight_breakdown,
             'exact_weight' => $package->exact_weight,
             'price_per_pound' => $package->price_per_pound,
             'total' => $package->total,
