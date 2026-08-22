@@ -28,8 +28,9 @@ class PackageController extends Controller
             ->orderByRaw("CASE status
                 WHEN 'recibido' THEN 1
                 WHEN 'en_transito' THEN 2
-                WHEN 'listo' THEN 3
-                ELSE 4 END")
+                WHEN 'aduanas' THEN 3
+                WHEN 'listo' THEN 4
+                ELSE 5 END")
             ->latest('received_at')
             ->paginate((int) $request->query('per_page', 10));
 

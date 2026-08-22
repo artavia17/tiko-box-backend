@@ -163,7 +163,7 @@ class PackageController extends Controller
     {
         $data = $request->validate([
             // 'entregado' no entra acá: la entrega se firma, ver deliver().
-            'status' => ['required', Rule::in(['recibido', 'en_transito', 'listo'])],
+            'status' => ['required', Rule::in(PackageTracker::manualStatuses())],
             'note' => ['nullable', 'string', 'max:200'],
         ], [
             'status.in' => 'Para entregar el paquete hay que registrar la firma de quien lo recibe.',

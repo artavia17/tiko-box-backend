@@ -17,13 +17,29 @@ use Illuminate\Support\Facades\Mail;
  */
 class PackageTracker
 {
-    /** Qué se le dice al cliente en cada estado. */
+    /**
+     * El recorrido del paquete, en orden. Agregar un paso es agregarlo acá:
+     * la validación y las pantallas leen de esta lista.
+     */
     public const DESCRIPTIONS = [
         'recibido' => 'Llegó a nuestro almacén en Miami y ya está a tu nombre.',
         'en_transito' => 'Va camino a Costa Rica.',
+        'aduanas' => 'Está en aduanas en Costa Rica. Apenas salga te lo llevamos.',
         'listo' => 'Está en Costa Rica, listo para entregarte.',
         'entregado' => 'Te lo entregamos con la firma de quien lo recibió.',
     ];
+
+    /** @return list<string> */
+    public static function statuses(): array
+    {
+        return array_keys(self::DESCRIPTIONS);
+    }
+
+    /** Los que puede poner el almacén: entregar exige firma, va aparte. */
+    public static function manualStatuses(): array
+    {
+        return array_values(array_diff(self::statuses(), ['entregado']));
+    }
 
     /**
      * Deja constancia del estado actual y manda el correo.
