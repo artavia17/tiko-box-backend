@@ -19,6 +19,7 @@ class PackageStatusMail extends Mailable
     private const SUBJECTS = [
         'recibido' => 'Recibimos tu paquete en Miami',
         'en_transito' => 'Tu paquete va camino a Costa Rica',
+        'aduanas' => 'Tu paquete está en aduanas',
         'listo' => 'Tu paquete ya está en Costa Rica',
         'entregado' => 'Entregamos tu paquete',
     ];
@@ -53,10 +54,11 @@ class PackageStatusMail extends Mailable
      */
     private function steps(): array
     {
-        $order = ['recibido', 'en_transito', 'listo', 'entregado'];
+        $order = PackageTracker::statuses();
         $labels = [
             'recibido' => 'Recibido en Miami',
             'en_transito' => 'En tránsito',
+            'aduanas' => 'En aduanas',
             'listo' => 'En Costa Rica',
             'entregado' => 'Entregado',
         ];
