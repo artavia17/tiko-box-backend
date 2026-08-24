@@ -52,7 +52,8 @@ class AdminController extends Controller
                 'packages' => [
                     'recibido' => Package::where('status', 'recibido')->count(),
                     'en_transito' => Package::where('status', 'en_transito')->count(),
-                    'listo' => Package::where('status', 'listo')->count(),
+                    'bodega' => Package::where('status', 'bodega')->count(),
+                    'en_ruta' => Package::where('status', 'en_ruta')->count(),
                     'entregado' => Package::where('status', 'entregado')->count(),
                     'registrados_periodo' => Package::whereBetween('received_at', [$from, $to])->count(),
                 ],

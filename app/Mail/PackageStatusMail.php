@@ -20,7 +20,8 @@ class PackageStatusMail extends Mailable
         'recibido' => 'Recibimos tu paquete en Miami',
         'en_transito' => 'Tu paquete va camino a Costa Rica',
         'aduanas' => 'Tu paquete está en aduanas',
-        'listo' => 'Tu paquete ya está en Costa Rica',
+        'bodega' => 'Tu paquete llegó a nuestra bodega',
+        'en_ruta' => 'Tu paquete va en camino a tu casa',
         'entregado' => 'Entregamos tu paquete',
     ];
 
@@ -59,7 +60,8 @@ class PackageStatusMail extends Mailable
             'recibido' => 'Recibido en Miami',
             'en_transito' => 'En tránsito',
             'aduanas' => 'En aduanas',
-            'listo' => 'En Costa Rica',
+            'bodega' => 'En bodega',
+            'en_ruta' => 'En ruta',
             'entregado' => 'Entregado',
         ];
 

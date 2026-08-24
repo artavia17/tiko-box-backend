@@ -25,7 +25,8 @@ class PackageTracker
         'recibido' => 'Llegó a nuestro almacén en Miami y ya está a tu nombre.',
         'en_transito' => 'Va camino a Costa Rica.',
         'aduanas' => 'Está en aduanas en Costa Rica. Apenas salga te lo llevamos.',
-        'listo' => 'Está en Costa Rica, listo para entregarte.',
+        'bodega' => 'Ya está en nuestra bodega en Costa Rica.',
+        'en_ruta' => 'Va en camino a tu dirección.',
         'entregado' => 'Te lo entregamos con la firma de quien lo recibió.',
     ];
 
