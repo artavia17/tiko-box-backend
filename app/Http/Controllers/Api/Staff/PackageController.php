@@ -320,7 +320,7 @@ class PackageController extends Controller
             'data' => [
                 'recibidos_hoy' => Package::whereDate('received_at', today())->count(),
                 'en_transito' => Package::where('status', 'en_transito')->count(),
-                'listos' => Package::where('status', 'listo')->count(),
+                'listos' => Package::whereIn('status', ['bodega', 'en_ruta'])->count(),
                 'entregados_mes' => Package::where('status', 'entregado')
                     ->whereMonth('delivered_at', now()->month)
                     ->whereYear('delivered_at', now()->year)

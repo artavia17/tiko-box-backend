@@ -29,8 +29,9 @@ class PackageController extends Controller
                 WHEN 'recibido' THEN 1
                 WHEN 'en_transito' THEN 2
                 WHEN 'aduanas' THEN 3
-                WHEN 'listo' THEN 4
-                ELSE 5 END")
+                WHEN 'bodega' THEN 4
+                WHEN 'en_ruta' THEN 5
+                ELSE 6 END")
             ->latest('received_at')
             ->paginate((int) $request->query('per_page', 10));
 
