@@ -58,15 +58,19 @@ class UserController extends Controller
             // Los permisos y el casillero son cosas distintas: quien
             // administra el negocio también compra.
             'receives_packages' => ['nullable', 'boolean'],
+            'email_verified' => ['nullable', 'boolean'],
         ]);
 
         $user = User::create([
-            ...collect($data)->except('receives_packages')->all(),
+            ...collect($data)->except(['receives_packages', 'email_verified'])->all(),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
-            // Alta hecha por administración: el correo ya se da por bueno.
-            'email_verified_at' => now(),
             'locker_code' => $this->lockerFor($data),
         ]);
+
+        // Un alta de mostrador la hace alguien de adentro que ya tiene a la
+        // persona enfrente, así que el correo se da por bueno salvo que
+        // pidan lo contrario.
+        $this->setVerification($user, $data['email_verified'] ?? true);
 
         return response()->json(['data' => $this->present($user->loadCount('packages'))], 201);
     }
@@ -84,18 +88,43 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['cliente', 'empleado', 'admin'])],
             'password' => ['nullable', 'string', 'min:8'],
             'receives_packages' => ['nullable', 'boolean'],
+            'email_verified' => ['nullable', 'boolean'],
         ]);
 
         $this->guardLastAdmin($request, $user, $data['role']);
 
         $user->update([
-            ...collect($data)->except(['password', 'receives_packages'])->all(),
+            ...collect($data)->except(['password', 'receives_packages', 'email_verified'])->all(),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
             'locker_code' => $this->lockerFor($data, $user),
             ...(filled($data['password'] ?? null) ? ['password' => $data['password']] : []),
         ]);
 
+        // Solo se toca si viene en la petición: una edición de datos no
+        // debería confirmar ni desconfirmar a nadie sin querer.
+        if ($request->has('email_verified')) {
+            $this->setVerification($user, $data['email_verified']);
+        }
+
         return response()->json(['data' => $this->present($user->fresh()->loadCount('packages'))]);
+    }
+
+    /**
+     * Marca o quita la confirmación del correo.
+     *
+     * Va aparte y con forceFill porque `email_verified_at` no es asignable en
+     * masa a propósito: así ningún formulario puede darse por confirmado solo
+     * mandando el campo. Solo esta pantalla, que es de administración, lo hace
+     * a mano.
+     */
+    private function setVerification(User $user, mixed $verified): void
+    {
+        $verified = filter_var($verified, FILTER_VALIDATE_BOOL);
+
+        $user->forceFill([
+            // Si ya estaba confirmada se respeta la fecha original.
+            'email_verified_at' => $verified ? ($user->email_verified_at ?? now()) : null,
+        ])->save();
     }
 
     /**
