@@ -6,16 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\PackagePhoto;
 use App\Models\Prealert;
-use App\Services\PackageTracker;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rules\File;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\User;
+use App\Services\PackageTracker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /** Registro y seguimiento de paquetes desde el almacén. */
 class PackageController extends Controller
@@ -87,7 +87,13 @@ class PackageController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'photos' => ['nullable', 'array', 'max:8'],
             'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
+            // Descuento al registrar: o un monto fijo, o un porcentaje.
+            'discount_type' => ['nullable', Rule::in(['monto', 'porcentaje'])],
+            'discount_value' => ['nullable', 'required_with:discount_type', 'numeric', 'min:0.01'],
+            'discount_note' => ['nullable', 'required_with:discount_type', 'string', 'max:200'],
         ], [
+            'discount_value.required_with' => 'Anotá cuánto es el descuento.',
+            'discount_note.required_with' => 'Escribí por qué se le hace el descuento.',
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
             'photos.max' => 'Hasta 8 fotos por paquete.',
@@ -119,7 +125,10 @@ class PackageController extends Controller
             ? $weight
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
-        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $billable, $request) {
+        $list = round($billable * $pricePerPound, 2);
+        $discount = $this->discountFor($request, $data, $list);
+
+        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $list, $discount, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
             $prealert = Prealert::where('user_id', $customer->id)
                 ->where('tracking_number', $tracking)
@@ -138,7 +147,13 @@ class PackageController extends Controller
                 'weight_lb' => $weight,
                 'exact_weight' => $exact,
                 'price_per_pound' => $pricePerPound,
-                'total' => round($billable * $pricePerPound, 2),
+                'total' => $discount ? $discount['total'] : $list,
+                // Con descuento queda guardado lo que daba la tarifa, para que
+                // el cliente y el almacén vean de dónde salió el precio.
+                'original_total' => $discount ? $list : null,
+                'price_note' => $discount['note'] ?? null,
+                'price_adjusted_by' => $discount ? $request->user()->id : null,
+                'price_adjusted_at' => $discount ? now() : null,
                 'status' => 'recibido',
                 'received_at' => now(),
             ]);
@@ -228,6 +243,48 @@ class PackageController extends Controller
      * El cobro por tarifa queda guardado aparte para saber cuánto se rebajó, y
      * el ajuste anota quién lo hizo: es plata de la empresa.
      */
+    /**
+     * El descuento que se pide al registrar, ya resuelto a plata.
+     *
+     * Cambiar lo que se cobra es cosa de administración, igual que el precio
+     * especial que se hace después: si cualquiera del almacén pudiera rebajar
+     * al registrar, ese control no existiría.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{total: float, note: string}|null
+     */
+    private function discountFor(Request $request, array $data, float $list): ?array
+    {
+        $type = $data['discount_type'] ?? null;
+
+        if (! $type) {
+            return null;
+        }
+
+        abort_unless($request->user()->isAdmin(), 403, 'Solo administración hace descuentos.');
+
+        $value = (float) $data['discount_value'];
+
+        if ($type === 'porcentaje' && $value > 100) {
+            throw ValidationException::withMessages([
+                'discount_value' => 'El descuento no puede pasar del 100%.',
+            ]);
+        }
+
+        $off = $type === 'porcentaje' ? $list * $value / 100 : $value;
+
+        if (round($off, 2) > $list) {
+            throw ValidationException::withMessages([
+                'discount_value' => 'El descuento no puede ser mayor que el total.',
+            ]);
+        }
+
+        return [
+            'total' => round($list - $off, 2),
+            'note' => $data['discount_note'],
+        ];
+    }
+
     public function adjustPrice(Request $request, Package $package): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403, 'Solo administración cambia el precio.');
