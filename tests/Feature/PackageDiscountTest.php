@@ -147,4 +147,38 @@ class PackageDiscountTest extends TestCase
             'discount_value' => 10,
         ]))->assertJsonValidationErrors('discount_note');
     }
+
+    public function test_se_puede_cobrar_menos_libras_de_las_que_peso(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        // Pesó 60 lb pero se le cobran 50: se le rebajan 10 lb × $6.5.
+        $this->postJson('/api/staff/packages', $this->payload($customer, [
+            'weight_lb' => 60,
+            'discount_type' => 'libras',
+            'discount_value' => 50,
+            'discount_note' => 'Ajuste por volumen',
+        ]))->assertCreated();
+
+        $package = Package::first();
+
+        $this->assertEqualsWithDelta(325.00, (float) $package->total, 0.001);
+        $this->assertEqualsWithDelta(390.00, (float) $package->original_total, 0.001);
+        // El peso real no se toca: lo que cambia es lo que se cobra.
+        $this->assertEqualsWithDelta(60.0, (float) $package->weight_lb, 0.001);
+    }
+
+    public function test_no_se_pueden_cobrar_mas_libras_de_las_que_peso(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson('/api/staff/packages', $this->payload($customer, [
+            'weight_lb' => 60,
+            'discount_type' => 'libras',
+            'discount_value' => 70,
+            'discount_note' => 'Al revés',
+        ]))->assertJsonValidationErrors('discount_value');
+    }
 }
