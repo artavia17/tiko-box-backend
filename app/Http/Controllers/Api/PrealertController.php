@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Prealert;
+use App\Services\AdminNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -41,7 +42,7 @@ class PrealertController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, AdminNotifier $admins): JsonResponse
     {
         $data = $this->validated($request);
 
@@ -52,6 +53,8 @@ class PrealertController extends Controller
             'origin' => $data['origin'] ?? 'Miami',
             'expected_arrival' => $data['expected_arrival'] ?? null,
         ]);
+
+        $admins->prealertCreated($prealert);
 
         // fresh() para traer el estado por defecto que pone la base de datos.
         return response()->json(['data' => $this->present($prealert->fresh())], 201);

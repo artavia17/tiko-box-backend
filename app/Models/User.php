@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -89,11 +90,17 @@ class User extends Authenticatable
      * Cliente es quien tiene casillero, sin importar sus permisos: el dueño
      * del negocio también compra y recibe paquetes.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<User>  $query
+     * @param  Builder<User>  $query
      */
     public function scopeCustomers($query): void
     {
         $query->whereNotNull('locker_code');
+    }
+
+    /** Quienes gobiernan el panel: a ellos van los avisos internos. */
+    public function scopeAdmins($query): void
+    {
+        $query->where('role', 'admin');
     }
 
     /** ¿Tiene casillero para recibir paquetes? */
