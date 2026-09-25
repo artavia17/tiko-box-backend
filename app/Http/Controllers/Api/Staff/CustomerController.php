@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\PackageTracker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,7 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = trim((string) $request->query('search'));
+        $status = (string) $request->query('status');
 
         // El empleado busca al dueño de una caja concreta; recorrer el
         // directorio entero de clientes es cosa de administración.
@@ -31,6 +33,19 @@ class CustomerController extends Controller
                     }
                 });
             })
+            // Quién tiene algo todavía en movimiento, o parado en un punto
+            // concreto del recorrido. 'entregado' no filtra a propósito: con
+            // el tiempo todo cliente tiene entregas y la lista no separaría
+            // a nadie de nadie.
+            ->when($status === 'activos', fn ($query) => $query->whereHas(
+                'packages',
+                fn ($packages) => $packages->whereIn('status', PackageTracker::openStatuses()),
+            ))
+            ->when(in_array($status, PackageTracker::openStatuses(), true),
+                fn ($query) => $query->whereHas(
+                    'packages',
+                    fn ($packages) => $packages->where('status', $status),
+                ))
             ->withCount('packages')
             ->orderBy('name')
             ->paginate((int) $request->query('per_page', 20));
