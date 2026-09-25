@@ -43,6 +43,18 @@ class PackageTracker
     }
 
     /**
+     * Los que siguen en curso: el paquete todavía no llegó a su dueño.
+     *
+     * Hoy da la misma lista que manualStatuses(), pero por otro motivo, así
+     * que se calcula aparte: un estado que el almacén no ponga a mano podría
+     * seguir estando en curso.
+     */
+    public static function openStatuses(): array
+    {
+        return array_values(array_diff(self::statuses(), ['entregado']));
+    }
+
+    /**
      * Deja constancia del estado actual y manda el correo.
      *
      * @param  User|null  $actor  Quién lo movió, si fue alguien del almacén.
