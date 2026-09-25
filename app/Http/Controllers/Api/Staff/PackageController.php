@@ -89,9 +89,7 @@ class PackageController extends Controller
             'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
             // Tarifa especial: se le cobra la libra más barata que de lista.
             'price_per_pound' => ['nullable', 'numeric', 'min:0.01'],
-            'discount_note' => ['nullable', 'required_with:price_per_pound', 'string', 'max:200'],
         ], [
-            'discount_note.required_with' => 'Escribí por qué se le hace precio.',
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
             'photos.max' => 'Hasta 8 fotos por paquete.',
@@ -150,7 +148,6 @@ class PackageController extends Controller
                 'price_per_pound' => $pricePerPound,
                 'total' => $total,
                 'original_total' => $list,
-                'price_note' => $list ? $data['discount_note'] : null,
                 'price_adjusted_by' => $list ? $request->user()->id : null,
                 'price_adjusted_at' => $list ? now() : null,
                 'status' => 'recibido',

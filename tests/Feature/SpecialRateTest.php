@@ -50,7 +50,6 @@ class SpecialRateTest extends TestCase
 
         $this->postJson('/api/staff/packages', $this->payload($customer, [
             'price_per_pound' => 4,
-            'discount_note' => 'Cliente frecuente',
         ]))->assertCreated();
 
         $package = Package::first();
@@ -58,7 +57,6 @@ class SpecialRateTest extends TestCase
         $this->assertEqualsWithDelta(40.00, (float) $package->total, 0.001);
         $this->assertEqualsWithDelta(65.00, (float) $package->original_total, 0.001);
         $this->assertEqualsWithDelta(4.00, (float) $package->price_per_pound, 0.001);
-        $this->assertSame('Cliente frecuente', $package->price_note);
         $this->assertNotNull($package->price_adjusted_at);
     }
 
@@ -85,20 +83,9 @@ class SpecialRateTest extends TestCase
 
         $this->postJson('/api/staff/packages', $this->payload($customer, [
             'price_per_pound' => 9,
-            'discount_note' => 'Recargo',
         ]))->assertJsonValidationErrors('price_per_pound');
 
         $this->assertSame(0, Package::count());
-    }
-
-    public function test_la_tarifa_especial_exige_motivo(): void
-    {
-        $this->signIn('admin');
-        $customer = $this->customer();
-
-        $this->postJson('/api/staff/packages', $this->payload($customer, [
-            'price_per_pound' => 4,
-        ]))->assertJsonValidationErrors('discount_note');
     }
 
     public function test_un_empleado_no_puede_hacer_precio(): void
@@ -108,7 +95,6 @@ class SpecialRateTest extends TestCase
 
         $this->postJson('/api/staff/packages', $this->payload($customer, [
             'price_per_pound' => 4,
-            'discount_note' => 'Porque sí',
         ]))->assertForbidden();
 
         $this->assertSame(0, Package::count());
@@ -132,7 +118,6 @@ class SpecialRateTest extends TestCase
         $this->postJson('/api/staff/packages', $this->payload($customer, [
             'weight_lb' => 0.4,
             'price_per_pound' => 4,
-            'discount_note' => 'Paquete chico',
         ]))->assertCreated();
 
         // Pesa menos de una libra, así que se cobra una a la tarifa pactada.
