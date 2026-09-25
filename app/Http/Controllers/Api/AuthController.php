@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\ShippingAddress;
 use App\Models\User;
+use App\Services\AdminNotifier;
 use App\Services\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly EmailVerificationService $verification,
+        private readonly AdminNotifier $admins,
     ) {}
 
     /**
@@ -62,6 +64,7 @@ class AuthController extends Controller
         });
 
         $this->verification->send($user);
+        $this->admins->customerRegistered($user);
 
         return response()->json([
             'requires_verification' => true,
