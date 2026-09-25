@@ -87,13 +87,11 @@ class PackageController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'photos' => ['nullable', 'array', 'max:8'],
             'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
-            // Descuento al registrar: o un monto fijo, o un porcentaje.
-            'discount_type' => ['nullable', Rule::in(['monto', 'porcentaje', 'libras'])],
-            'discount_value' => ['nullable', 'required_with:discount_type', 'numeric', 'min:0.01'],
-            'discount_note' => ['nullable', 'required_with:discount_type', 'string', 'max:200'],
+            // Tarifa especial: se le cobra la libra más barata que de lista.
+            'price_per_pound' => ['nullable', 'numeric', 'min:0.01'],
+            'discount_note' => ['nullable', 'required_with:price_per_pound', 'string', 'max:200'],
         ], [
-            'discount_value.required_with' => 'Anotá cuánto es el descuento.',
-            'discount_note.required_with' => 'Escribí por qué se le hace el descuento.',
+            'discount_note.required_with' => 'Escribí por qué se le hace precio.',
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
             'photos.max' => 'Hasta 8 fotos por paquete.',
@@ -118,17 +116,20 @@ class PackageController extends Controller
         $weight = round((float) $data['weight_lb'], 2);
         $exact = filter_var($data['exact_weight'] ?? false, FILTER_VALIDATE_BOOL);
 
-        $pricePerPound = (float) config('tikabox.price_per_pound');
+        $listRate = (float) config('tikabox.price_per_pound');
+        $pricePerPound = $this->rateFor($request, $data, $listRate);
 
         // Se cobra un mínimo aunque pese menos, salvo que se pida lo exacto.
         $billable = $exact
             ? $weight
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
-        $list = round($billable * $pricePerPound, 2);
-        $discount = $this->discountFor($request, $data, $list, $billable, $pricePerPound);
+        $total = round($billable * $pricePerPound, 2);
+        // Con tarifa especial se guarda lo que habría costado de lista, que es
+        // lo que convierte esto en un descuento visible para el cliente.
+        $list = $pricePerPound < $listRate ? round($billable * $listRate, 2) : null;
 
-        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $list, $discount, $request) {
+        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $total, $list, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
             $prealert = Prealert::where('user_id', $customer->id)
                 ->where('tracking_number', $tracking)
@@ -147,13 +148,11 @@ class PackageController extends Controller
                 'weight_lb' => $weight,
                 'exact_weight' => $exact,
                 'price_per_pound' => $pricePerPound,
-                'total' => $discount ? $discount['total'] : $list,
-                // Con descuento queda guardado lo que daba la tarifa, para que
-                // el cliente y el almacén vean de dónde salió el precio.
-                'original_total' => $discount ? $list : null,
-                'price_note' => $discount['note'] ?? null,
-                'price_adjusted_by' => $discount ? $request->user()->id : null,
-                'price_adjusted_at' => $discount ? now() : null,
+                'total' => $total,
+                'original_total' => $list,
+                'price_note' => $list ? $data['discount_note'] : null,
+                'price_adjusted_by' => $list ? $request->user()->id : null,
+                'price_adjusted_at' => $list ? now() : null,
                 'status' => 'recibido',
                 'received_at' => now(),
             ]);
@@ -244,65 +243,36 @@ class PackageController extends Controller
      * el ajuste anota quién lo hizo: es plata de la empresa.
      */
     /**
-     * El descuento que se pide al registrar, ya resuelto a plata.
+     * Lo que se le cobra la libra a este paquete.
+     *
+     * Se le puede hacer precio cobrándosela más barata que la de lista; más
+     * cara no, porque eso sería un recargo y no es lo que esta pantalla hace.
      *
      * Cambiar lo que se cobra es cosa de administración, igual que el precio
-     * especial que se hace después: si cualquiera del almacén pudiera rebajar
-     * al registrar, ese control no existiría.
-     *
-     * Son tres formas de decir lo mismo: un monto, un porcentaje, o las
-     * libras que se le cobran en lugar de las que pesó. Todas terminan en
-     * plata rebajada sobre la tarifa.
+     * especial que se hace después de registrar: si cualquiera del almacén
+     * pudiera rebajar la tarifa, ese control no existiría.
      *
      * @param  array<string, mixed>  $data
-     * @return array{total: float, note: string}|null
      */
-    private function discountFor(
-        Request $request,
-        array $data,
-        float $list,
-        float $billable,
-        float $pricePerPound,
-    ): ?array {
-        $type = $data['discount_type'] ?? null;
+    private function rateFor(Request $request, array $data, float $listRate): float
+    {
+        $rate = $data['price_per_pound'] ?? null;
 
-        if (! $type) {
-            return null;
+        if ($rate === null) {
+            return $listRate;
         }
 
-        abort_unless($request->user()->isAdmin(), 403, 'Solo administración hace descuentos.');
+        abort_unless($request->user()->isAdmin(), 403, 'Solo administración hace precio.');
 
-        $value = (float) $data['discount_value'];
+        $rate = round((float) $rate, 2);
 
-        if ($type === 'porcentaje' && $value > 100) {
+        if ($rate > $listRate) {
             throw ValidationException::withMessages([
-                'discount_value' => 'El descuento no puede pasar del 100%.',
+                'price_per_pound' => "La tarifa es de \${$listRate} la libra: no se puede cobrar más.",
             ]);
         }
 
-        // Cobrarle más libras de las que pesó no es un descuento.
-        if ($type === 'libras' && $value > $billable) {
-            throw ValidationException::withMessages([
-                'discount_value' => "El paquete se cobra por {$billable} lb: poné menos.",
-            ]);
-        }
-
-        $off = match ($type) {
-            'porcentaje' => $list * $value / 100,
-            'libras' => ($billable - $value) * $pricePerPound,
-            default => $value,
-        };
-
-        if (round($off, 2) > $list) {
-            throw ValidationException::withMessages([
-                'discount_value' => 'El descuento no puede ser mayor que el total.',
-            ]);
-        }
-
-        return [
-            'total' => round($list - $off, 2),
-            'note' => $data['discount_note'],
-        ];
+        return $rate;
     }
 
     public function adjustPrice(Request $request, Package $package): JsonResponse
