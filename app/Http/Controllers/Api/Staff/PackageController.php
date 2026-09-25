@@ -88,7 +88,7 @@ class PackageController extends Controller
             'photos' => ['nullable', 'array', 'max:8'],
             'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
             // Descuento al registrar: o un monto fijo, o un porcentaje.
-            'discount_type' => ['nullable', Rule::in(['monto', 'porcentaje'])],
+            'discount_type' => ['nullable', Rule::in(['monto', 'porcentaje', 'libras'])],
             'discount_value' => ['nullable', 'required_with:discount_type', 'numeric', 'min:0.01'],
             'discount_note' => ['nullable', 'required_with:discount_type', 'string', 'max:200'],
         ], [
@@ -126,7 +126,7 @@ class PackageController extends Controller
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
         $list = round($billable * $pricePerPound, 2);
-        $discount = $this->discountFor($request, $data, $list);
+        $discount = $this->discountFor($request, $data, $list, $billable, $pricePerPound);
 
         $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $list, $discount, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
@@ -250,11 +250,20 @@ class PackageController extends Controller
      * especial que se hace después: si cualquiera del almacén pudiera rebajar
      * al registrar, ese control no existiría.
      *
+     * Son tres formas de decir lo mismo: un monto, un porcentaje, o las
+     * libras que se le cobran en lugar de las que pesó. Todas terminan en
+     * plata rebajada sobre la tarifa.
+     *
      * @param  array<string, mixed>  $data
      * @return array{total: float, note: string}|null
      */
-    private function discountFor(Request $request, array $data, float $list): ?array
-    {
+    private function discountFor(
+        Request $request,
+        array $data,
+        float $list,
+        float $billable,
+        float $pricePerPound,
+    ): ?array {
         $type = $data['discount_type'] ?? null;
 
         if (! $type) {
@@ -271,7 +280,18 @@ class PackageController extends Controller
             ]);
         }
 
-        $off = $type === 'porcentaje' ? $list * $value / 100 : $value;
+        // Cobrarle más libras de las que pesó no es un descuento.
+        if ($type === 'libras' && $value > $billable) {
+            throw ValidationException::withMessages([
+                'discount_value' => "El paquete se cobra por {$billable} lb: poné menos.",
+            ]);
+        }
+
+        $off = match ($type) {
+            'porcentaje' => $list * $value / 100,
+            'libras' => ($billable - $value) * $pricePerPound,
+            default => $value,
+        };
 
         if (round($off, 2) > $list) {
             throw ValidationException::withMessages([
