@@ -123,11 +123,12 @@ class PackageController extends Controller
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
         $total = round($billable * $pricePerPound, 2);
+        $cost = round($billable * (float) config('tikabox.cost_per_pound'), 2);
         // Con tarifa especial se guarda lo que habría costado de lista, que es
         // lo que convierte esto en un descuento visible para el cliente.
         $list = $pricePerPound < $listRate ? round($billable * $listRate, 2) : null;
 
-        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $total, $list, $request) {
+        $package = DB::transaction(function () use ($customer, $data, $tracking, $weight, $exact, $pricePerPound, $total, $cost, $list, $request) {
             // Si el cliente lo había prealertado, se enlaza y se marca recibida.
             $prealert = Prealert::where('user_id', $customer->id)
                 ->where('tracking_number', $tracking)
@@ -147,6 +148,11 @@ class PackageController extends Controller
                 'exact_weight' => $exact,
                 'price_per_pound' => $pricePerPound,
                 'total' => $total,
+                // Lo que nos cuesta y el cambio del día quedan pegados al
+                // paquete: así la ganancia de un mes cerrado no se mueve
+                // después.
+                'cost' => $cost,
+                'exchange_rate' => (float) config('tikabox.exchange_rate'),
                 'original_total' => $list,
                 'price_adjusted_by' => $list ? $request->user()->id : null,
                 'price_adjusted_at' => $list ? now() : null,

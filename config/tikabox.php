@@ -31,6 +31,16 @@ return [
     /** Nada se cobra por debajo de esto, aunque pese menos. */
     'minimum_weight_lb' => (float) env('MINIMUM_WEIGHT_LB', 1),
 
+    /**
+     * Lo que le cuesta al negocio cada libra puesta en Costa Rica. Es el
+     * punto de partida del costo de un paquete; si la factura del proveedor
+     * viene distinta, se corrige paquete por paquete desde Finanzas.
+     */
+    'cost_per_pound' => (float) env('COST_PER_POUND', 3.49),
+
+    /** Colones por dólar. Cada paquete guarda el que tenía al registrarse. */
+    'exchange_rate' => (float) env('EXCHANGE_RATE', 466),
+
     /*
     |--------------------------------------------------------------------------
     | Verificación de correo
