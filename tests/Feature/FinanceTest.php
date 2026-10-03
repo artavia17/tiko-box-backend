@@ -224,4 +224,114 @@ class FinanceTest extends TestCase
         $this->assertEqualsWithDelta(34.90, (float) $package->fresh()->cost, 0.001);
         $this->assertEqualsWithDelta(30.10 * 520, $response->json('data.profit_crc'), 0.01);
     }
+
+    public function test_se_puede_corregir_el_monto_de_venta(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $response = $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'total' => 50,
+        ]);
+
+        $response->assertOk();
+        $this->assertEqualsWithDelta(50.00, $response->json('data.revenue'), 0.001);
+        // Con costo de 34.90, la ganancia baja a 15.10.
+        $this->assertEqualsWithDelta(15.10, $response->json('data.profit'), 0.001);
+
+        // Queda guardado lo que daba la tarifa: es lo que el cliente ve
+        // tachado y lo que imprime la factura.
+        $this->assertEqualsWithDelta(65.00, (float) $package->fresh()->original_total, 0.001);
+    }
+
+    public function test_corregir_dos_veces_no_achica_el_descuento(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", ['total' => 50]);
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", ['total' => 45]);
+
+        // La tarifa original sigue siendo la primera, no los 50 intermedios.
+        $this->assertEqualsWithDelta(65.00, (float) $package->fresh()->original_total, 0.001);
+    }
+
+    public function test_volver_al_precio_de_lista_deja_de_ser_descuento(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", ['total' => 50]);
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", ['total' => 65]);
+
+        $this->assertNull($package->fresh()->original_total);
+    }
+
+    public function test_una_venta_anulada_no_entra_en_los_totales(): void
+    {
+        $this->signIn('admin');
+        $this->package();
+        $anulado = $this->package();
+
+        $this->postJson("/api/staff/finances/packages/{$anulado->id}/void", [
+            'reason' => 'El paquete se perdió',
+        ])->assertOk();
+
+        $report = $this->getJson('/api/staff/finances')->json('data');
+
+        $this->assertSame(1, $report['voided']);
+        $this->assertSame(1, $report['totals']['packages']);
+        $this->assertEqualsWithDelta(65.00, $report['totals']['revenue'], 0.001);
+        $this->assertEqualsWithDelta(30.10, $report['totals']['profit'], 0.001);
+
+        // La fila sigue existiendo: la caja tiene que poder explicarla.
+        $fila = collect($report['rows'])->firstWhere('voided', true);
+        $this->assertSame('El paquete se perdió', $fila['void_reason']);
+    }
+
+    public function test_se_puede_deshacer_una_anulacion(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->postJson("/api/staff/finances/packages/{$package->id}/void");
+        $this->deleteJson("/api/staff/finances/packages/{$package->id}/void")->assertOk();
+
+        $report = $this->getJson('/api/staff/finances')->json('data');
+
+        $this->assertSame(0, $report['voided']);
+        $this->assertSame(1, $report['totals']['packages']);
+    }
+
+    public function test_un_empleado_no_puede_anular_una_venta(): void
+    {
+        $admin = $this->signIn('admin');
+        $package = $this->package();
+
+        $employee = User::factory()->create(['role' => 'empleado']);
+        $this->actingAs($employee);
+        $employee->withAccessToken($employee->createToken('test', ['staff'])->accessToken);
+
+        $this->postJson("/api/staff/finances/packages/{$package->id}/void")->assertForbidden();
+        $this->assertNull($package->fresh()->voided_at);
+        $this->assertNotNull($admin);
+    }
+
+    public function test_se_anota_a_mano_quien_cobro_el_paquete(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $response = $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'collected_by' => 'Henry',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.collected_by', 'Henry');
+
+        // Dejarlo en blanco lo borra, en vez de guardar una cadena vacía.
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'collected_by' => '  ',
+        ])->assertJsonPath('data.collected_by', null);
+    }
 }
