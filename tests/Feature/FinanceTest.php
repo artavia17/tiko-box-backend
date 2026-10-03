@@ -59,7 +59,6 @@ class FinanceTest extends TestCase
         // En colones, al cambio que tenía ese paquete.
         $this->assertEqualsWithDelta(34.90 * 466, $row['cost_crc'], 0.01);
         $this->assertEqualsWithDelta(30.10 * 466, $row['profit_crc'], 0.01);
-        $this->assertFalse($row['estimated']);
     }
 
     public function test_los_totales_suman_lo_que_muestran_las_filas(): void
@@ -76,17 +75,54 @@ class FinanceTest extends TestCase
         $this->assertEqualsWithDelta(36.12, $totals['profit'], 0.001);
     }
 
-    public function test_un_paquete_viejo_sin_costo_se_estima_y_queda_marcado(): void
+    public function test_un_paquete_sin_costo_queda_pendiente_y_fuera_de_los_totales(): void
     {
         $this->signIn('admin');
-        $this->package(['cost' => null, 'exchange_rate' => null]);
+        $this->package();
+        $this->package(['cost' => null]);
 
-        $row = $this->getJson('/api/staff/finances')->json('data.rows.0');
+        $report = $this->getJson('/api/staff/finances')->json('data');
 
-        // 10 lb por la tarifa de costo configurada.
-        $this->assertEqualsWithDelta(10 * config('tikabox.cost_per_pound'), $row['cost'], 0.01);
-        $this->assertTrue($row['estimated'], 'Tiene que avisar que ese costo es estimado.');
-        $this->assertSame(1, $this->getJson('/api/staff/finances')->json('data.estimated'));
+        $sinCosto = collect($report['rows'])->firstWhere('cost', null);
+
+        $this->assertNotNull($sinCosto, 'La fila tiene que aparecer igual.');
+        $this->assertNull($sinCosto['profit'], 'Sin costo no hay ganancia que mostrar.');
+        $this->assertSame(1, $report['pending']);
+
+        // Los totales solo cuentan lo que sí tiene costo: sumar una venta sin
+        // su costo daría una ganancia inflada.
+        $this->assertSame(1, $report['totals']['packages']);
+        $this->assertEqualsWithDelta(65.00, $report['totals']['revenue'], 0.001);
+        $this->assertEqualsWithDelta(30.10, $report['totals']['profit'], 0.001);
+    }
+
+    public function test_el_costo_se_digita_al_registrar_y_no_se_inventa(): void
+    {
+        $this->signIn('admin');
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        // Sin costo: queda pendiente.
+        $this->postJson('/api/staff/packages', [
+            'customer_id' => $customer->id,
+            'tracking_number' => 'TBA111',
+            'weight_lb' => 10,
+        ])->assertCreated();
+
+        $this->assertNull(Package::where('tracking_number', 'TBA111')->first()->cost);
+
+        // Con costo: se guarda tal cual lo digitaron.
+        $this->postJson('/api/staff/packages', [
+            'customer_id' => $customer->id,
+            'tracking_number' => 'TBA222',
+            'weight_lb' => 10,
+            'cost' => 28.75,
+        ])->assertCreated();
+
+        $this->assertEqualsWithDelta(
+            28.75,
+            (float) Package::where('tracking_number', 'TBA222')->first()->cost,
+            0.001,
+        );
     }
 
     public function test_el_tipo_de_cambio_viejo_no_se_pisa_con_el_de_hoy(): void
@@ -112,7 +148,6 @@ class FinanceTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.estimated', false);
         $this->assertEqualsWithDelta(25.00, $response->json('data.profit'), 0.001);
         $this->assertEqualsWithDelta(40.00, (float) $package->fresh()->cost, 0.001);
     }

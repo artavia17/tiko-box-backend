@@ -11,9 +11,12 @@ use Illuminate\Support\Carbon;
 /**
  * Lo que deja cada paquete: cuánto costó, cuánto se cobró y la diferencia.
  *
- * Nada de esto se calcula con números fijos. El costo y el tipo de cambio
- * viven en cada paquete, así que la ganancia de un mes ya cerrado no cambia
- * cuando se mueve el dólar o se renegocia la tarifa con el proveedor.
+ * El costo lo digita quien conoce lo que se pagó por el envío; acá nunca se
+ * estima. Un paquete sin costo queda pendiente y fuera de los totales, para
+ * que la ganancia que se muestra sea plata de verdad y no un supuesto.
+ *
+ * El costo y el tipo de cambio viven en cada paquete, así que la ganancia de
+ * un mes ya cerrado no cambia cuando se mueve el dólar.
  */
 class FinanceController extends Controller
 {
@@ -37,25 +40,28 @@ class FinanceController extends Controller
             ->get();
 
         $rows = $packages->map($this->present(...));
+        // Sumar ventas cuyo costo no se conoce daría una ganancia inflada.
+        $costed = $rows->where('cost', '!==', null);
 
         return response()->json([
             'data' => [
                 'period' => ['year' => $year, 'month' => $month],
                 'rows' => $rows,
                 'totals' => [
-                    'packages' => $rows->count(),
-                    'weight_lb' => round((float) $rows->sum('weight_lb'), 2),
-                    'cost' => round((float) $rows->sum('cost'), 2),
-                    'revenue' => round((float) $rows->sum('revenue'), 2),
-                    'profit' => round((float) $rows->sum('profit'), 2),
-                    'cost_crc' => round((float) $rows->sum('cost_crc'), 2),
-                    'revenue_crc' => round((float) $rows->sum('revenue_crc'), 2),
-                    'profit_crc' => round((float) $rows->sum('profit_crc'), 2),
+                    'packages' => $costed->count(),
+                    'weight_lb' => round((float) $costed->sum('weight_lb'), 2),
+                    'cost' => round((float) $costed->sum('cost'), 2),
+                    'revenue' => round((float) $costed->sum('revenue'), 2),
+                    'profit' => round((float) $costed->sum('profit'), 2),
+                    'cost_crc' => round((float) $costed->sum('cost_crc'), 2),
+                    'revenue_crc' => round((float) $costed->sum('revenue_crc'), 2),
+                    'profit_crc' => round((float) $costed->sum('profit_crc'), 2),
                 ],
                 // El resumen del año, mes por mes: es lo que deja ver si el
                 // negocio mejora o solo creció el movimiento.
                 'months' => $this->byMonth($year),
-                'estimated' => $rows->where('estimated', true)->count(),
+                // Cuántos siguen esperando que alguien diga qué costaron.
+                'pending' => $rows->count() - $costed->count(),
             ],
         ]);
     }
@@ -91,14 +97,16 @@ class FinanceController extends Controller
             ->sortKeys()
             ->map(function ($group, $month) {
                 $rows = $group->map($this->present(...));
+                $costed = $rows->where('cost', '!==', null);
 
                 return [
                     'month' => (int) $month,
                     'label' => Carbon::create(null, (int) $month, 1)->locale('es')->monthName,
                     'packages' => $rows->count(),
-                    'cost' => round((float) $rows->sum('cost'), 2),
-                    'revenue' => round((float) $rows->sum('revenue'), 2),
-                    'profit' => round((float) $rows->sum('profit'), 2),
+                    'pending' => $rows->count() - $costed->count(),
+                    'cost' => round((float) $costed->sum('cost'), 2),
+                    'revenue' => round((float) $costed->sum('revenue'), 2),
+                    'profit' => round((float) $costed->sum('profit'), 2),
                 ];
             })
             ->values()
@@ -108,18 +116,11 @@ class FinanceController extends Controller
     /** @return array<string, mixed> */
     private function present(Package $package): array
     {
-        // Un paquete de antes de que existiera esta pantalla no tiene costo
-        // guardado: se estima con la tarifa actual y se marca como tal, para
-        // que nadie tome por cerrado un número que todavía no lo es.
-        $estimated = $package->cost === null;
-
-        $cost = $estimated
-            ? round((float) $package->weight_lb * (float) config('tikabox.cost_per_pound'), 2)
-            : (float) $package->cost;
-
+        // Sin costo digitado no hay ganancia que mostrar: queda pendiente.
+        $cost = $package->cost === null ? null : (float) $package->cost;
         $rate = (float) ($package->exchange_rate ?? config('tikabox.exchange_rate'));
         $revenue = (float) $package->total;
-        $profit = round($revenue - $cost, 2);
+        $profit = $cost === null ? null : round($revenue - $cost, 2);
 
         return [
             'id' => $package->id,
@@ -131,12 +132,11 @@ class FinanceController extends Controller
             'revenue' => $revenue,
             'profit' => $profit,
             'exchange_rate' => $rate,
-            'cost_crc' => round($cost * $rate, 2),
+            'cost_crc' => $cost === null ? null : round($cost * $rate, 2),
             'revenue_crc' => round($revenue * $rate, 2),
-            'profit_crc' => round($profit * $rate, 2),
+            'profit_crc' => $profit === null ? null : round($profit * $rate, 2),
             'received_at' => $package->received_at?->toDateString(),
             'status' => $package->status,
-            'estimated' => $estimated,
         ];
     }
 }
