@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Canton;
-use App\Models\District;
 use App\Models\Province;
 use Illuminate\Http\JsonResponse;
 

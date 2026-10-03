@@ -92,6 +92,9 @@ class PackageController extends Controller
             // Lo que el envío costó de verdad. Si todavía no se sabe, queda
             // pendiente: inventarlo daría una ganancia que no es.
             'cost' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            // El colón se mueve todos los días, así que el cambio se digita
+            // con el paquete y queda pegado a él.
+            'exchange_rate' => ['nullable', 'numeric', 'min:1', 'max:5000'],
         ], [
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
@@ -155,7 +158,10 @@ class PackageController extends Controller
                 // paquete: así la ganancia de un mes cerrado no se mueve
                 // después.
                 'cost' => $cost,
-                'exchange_rate' => (float) config('tikabox.exchange_rate'),
+                'exchange_rate' => round(
+                    (float) ($data['exchange_rate'] ?? config('tikabox.exchange_rate')),
+                    2,
+                ),
                 'original_total' => $list,
                 'price_adjusted_by' => $list ? $request->user()->id : null,
                 'price_adjusted_at' => $list ? now() : null,
