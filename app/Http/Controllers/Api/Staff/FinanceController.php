@@ -181,8 +181,12 @@ class FinanceController extends Controller
                 return [
                     'month' => (int) $month,
                     'label' => Carbon::create(null, (int) $month, 1)->locale('es')->monthName,
-                    'packages' => $rows->count(),
+                    // Cuenta los mismos paquetes que suman en la plata de al
+                    // lado: una fila donde el número y el monto hablan de
+                    // conjuntos distintos se lee como un error de cálculo.
+                    'packages' => $costed->count(),
                     'pending' => $rows->where('voided', false)->where('cost', null)->count(),
+                    'voided' => $rows->where('voided', true)->count(),
                     'cost' => round((float) $costed->sum('cost'), 2),
                     'revenue' => round((float) $costed->sum('revenue'), 2),
                     'profit' => round((float) $costed->sum('profit'), 2),
