@@ -394,4 +394,32 @@ class FinanceTest extends TestCase
             'request_number' => '',
         ])->assertJsonPath('data.request_number', null);
     }
+
+    public function test_el_resumen_por_mes_no_cuenta_ni_suma_los_anulados(): void
+    {
+        $this->signIn('admin');
+
+        $this->package(['received_at' => now()->setMonth(9)->setDay(10)]);
+        $anulado = $this->package(['received_at' => now()->setMonth(9)->setDay(11)]);
+        $sinCosto = $this->package([
+            'received_at' => now()->setMonth(9)->setDay(12),
+            'cost' => null,
+        ]);
+
+        $this->postJson("/api/staff/finances/packages/{$anulado->id}/void")->assertOk();
+
+        $mes = collect($this->getJson('/api/staff/finances')->json('data.months'))
+            ->firstWhere('month', 9);
+
+        // Solo el que tiene costo y no está anulado.
+        $this->assertSame(1, $mes['packages']);
+        $this->assertEqualsWithDelta(34.90, $mes['cost'], 0.001);
+        $this->assertEqualsWithDelta(65.00, $mes['revenue'], 0.001);
+        $this->assertEqualsWithDelta(30.10, $mes['profit'], 0.001);
+
+        // Los otros dos se reportan aparte, cada uno por su motivo.
+        $this->assertSame(1, $mes['voided']);
+        $this->assertSame(1, $mes['pending']);
+        $this->assertNotNull($sinCosto);
+    }
 }
