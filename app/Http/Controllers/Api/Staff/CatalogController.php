@@ -7,8 +7,8 @@ use App\Models\CatalogOption;
 use App\Models\Package;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 /** Las listas de transportistas y tiendas que usa el almacén. */
 class CatalogController extends Controller
@@ -114,7 +114,7 @@ class CatalogController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, CatalogOption>  $options
+     * @param  Collection<int, CatalogOption>  $options
      * @return list<array{id: int, name: string}>
      */
     private function present($options, string $type): array

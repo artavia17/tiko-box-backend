@@ -143,7 +143,7 @@ class FinanceTest extends TestCase
         $this->signIn('admin');
         $package = $this->package();
 
-        $response = $this->patchJson("/api/staff/finances/packages/{$package->id}/cost", [
+        $response = $this->patchJson("/api/staff/finances/packages/{$package->id}", [
             'cost' => 40,
         ]);
 
@@ -171,5 +171,57 @@ class FinanceTest extends TestCase
         $this->signIn('empleado');
 
         $this->getJson('/api/staff/finances')->assertForbidden();
+    }
+
+    public function test_el_tipo_de_cambio_se_digita_con_el_paquete(): void
+    {
+        $this->signIn('admin');
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        $this->postJson('/api/staff/packages', [
+            'customer_id' => $customer->id,
+            'tracking_number' => 'TBA777',
+            'weight_lb' => 10,
+            'cost' => 30,
+            'exchange_rate' => 512.45,
+        ])->assertCreated();
+
+        $package = Package::where('tracking_number', 'TBA777')->first();
+
+        $this->assertEqualsWithDelta(512.45, (float) $package->exchange_rate, 0.001);
+    }
+
+    public function test_sin_digitarlo_se_usa_el_cambio_configurado(): void
+    {
+        $this->signIn('admin');
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        $this->postJson('/api/staff/packages', [
+            'customer_id' => $customer->id,
+            'tracking_number' => 'TBA888',
+            'weight_lb' => 10,
+        ])->assertCreated();
+
+        $this->assertEqualsWithDelta(
+            (float) config('tikabox.exchange_rate'),
+            (float) Package::where('tracking_number', 'TBA888')->first()->exchange_rate,
+            0.001,
+        );
+    }
+
+    public function test_se_puede_corregir_solo_el_tipo_de_cambio_sin_tocar_el_costo(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package(['cost' => 34.90, 'exchange_rate' => 466]);
+
+        $response = $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'exchange_rate' => 520,
+        ]);
+
+        $response->assertOk();
+        $this->assertEqualsWithDelta(520, $response->json('data.exchange_rate'), 0.001);
+        // El costo sigue donde estaba.
+        $this->assertEqualsWithDelta(34.90, (float) $package->fresh()->cost, 0.001);
+        $this->assertEqualsWithDelta(30.10 * 520, $response->json('data.profit_crc'), 0.01);
     }
 }

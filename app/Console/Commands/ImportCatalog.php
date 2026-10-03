@@ -75,7 +75,7 @@ class ImportCatalog extends Command
      * De dónde salen los nombres: del archivo, de la opción --names o de lo
      * que se le pase por la entrada estándar.
      *
-     * @return list<string>|null  Null si el archivo no existe.
+     * @return list<string>|null Null si el archivo no existe.
      */
     private function names(): ?array
     {

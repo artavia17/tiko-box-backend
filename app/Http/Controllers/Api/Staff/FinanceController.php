@@ -66,14 +66,26 @@ class FinanceController extends Controller
         ]);
     }
 
-    /** Corrige el costo de un paquete cuando llega la factura del proveedor. */
-    public function updateCost(Request $request, Package $package): JsonResponse
+    /**
+     * Corrige el costo o el tipo de cambio de un paquete.
+     *
+     * Lo primero llega con la factura del proveedor; lo segundo, cuando se
+     * registró con el cambio equivocado. Solo se toca lo que viene en la
+     * petición: mandar uno no debería borrar el otro.
+     */
+    public function update(Request $request, Package $package): JsonResponse
     {
         $data = $request->validate([
-            'cost' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'cost' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'exchange_rate' => ['nullable', 'numeric', 'min:1', 'max:5000'],
         ]);
 
-        $package->update(['cost' => round((float) $data['cost'], 2)]);
+        $package->update(array_filter([
+            'cost' => $request->has('cost') ? round((float) $data['cost'], 2) : null,
+            'exchange_rate' => $request->has('exchange_rate')
+                ? round((float) $data['exchange_rate'], 2)
+                : null,
+        ], fn ($value) => $value !== null));
 
         return response()->json([
             'data' => $this->present($package->fresh()->load('user')),
