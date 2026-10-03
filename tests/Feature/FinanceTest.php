@@ -411,16 +411,16 @@ class FinanceTest extends TestCase
         $mes = collect($this->getJson('/api/staff/finances')->json('data.months'))
             ->firstWhere('month', 9);
 
-        // Solo el que tiene costo y no está anulado.
-        $this->assertSame(1, $mes['packages']);
+        // Dos paquetes del mes: el costeado y el que falta costear. El
+        // anulado no cuenta.
+        $this->assertSame(2, $mes['packages']);
         $this->assertEqualsWithDelta(34.90, $mes['cost'], 0.001);
         $this->assertEqualsWithDelta(65.00, $mes['revenue'], 0.001);
         $this->assertEqualsWithDelta(30.10, $mes['profit'], 0.001);
 
-        // Lo pendiente de costear sí se reporta: todavía va a sumar.
-        $this->assertSame(1, $mes['pending']);
         // Lo anulado no aparece por ningún lado del resumen.
         $this->assertArrayNotHasKey('voided', $mes);
+        $this->assertArrayNotHasKey('pending', $mes);
         $this->assertNotNull($sinCosto);
     }
 }

@@ -181,11 +181,10 @@ class FinanceController extends Controller
                 return [
                     'month' => (int) $month,
                     'label' => Carbon::create(null, (int) $month, 1)->locale('es')->monthName,
-                    // Cuenta los mismos paquetes que suman en la plata de al
-                    // lado: una fila donde el número y el monto hablan de
-                    // conjuntos distintos se lee como un error de cálculo.
-                    'packages' => $costed->count(),
-                    'pending' => $rows->where('voided', false)->where('cost', null)->count(),
+                    // Cuántos paquetes entraron ese mes, estén costeados o
+                    // no. La plata de al lado solo puede contar los costeados,
+                    // pero el movimiento del mes es este número.
+                    'packages' => $rows->where('voided', false)->count(),
                     'cost' => round((float) $costed->sum('cost'), 2),
                     'revenue' => round((float) $costed->sum('revenue'), 2),
                     'profit' => round((float) $costed->sum('profit'), 2),
