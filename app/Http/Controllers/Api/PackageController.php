@@ -44,11 +44,14 @@ class PackageController extends Controller
                 'per_page' => $packages->perPage(),
                 // Sobre todos los paquetes, no solo los de esta página: lo que
                 // se debe no depende de cuántos quepan en pantalla.
+                // Una venta anulada no se le cobra a nadie.
                 'pending_total' => (float) $request->user()->packages()
                     ->where('status', '!=', 'entregado')
+                    ->whereNull('voided_at')
                     ->sum('total'),
                 'pending_count' => $request->user()->packages()
                     ->where('status', '!=', 'entregado')
+                    ->whereNull('voided_at')
                     ->count(),
             ],
         ]);
@@ -89,6 +92,7 @@ class PackageController extends Controller
         return [
             'id' => $package->id,
             'tracking_number' => $package->tracking_number,
+            'voided' => $package->voided_at !== null,
             'courier' => $package->courier,
             'store' => $package->store,
             'description' => $package->description,
