@@ -417,9 +417,10 @@ class FinanceTest extends TestCase
         $this->assertEqualsWithDelta(65.00, $mes['revenue'], 0.001);
         $this->assertEqualsWithDelta(30.10, $mes['profit'], 0.001);
 
-        // Los otros dos se reportan aparte, cada uno por su motivo.
-        $this->assertSame(1, $mes['voided']);
+        // Lo pendiente de costear sí se reporta: todavía va a sumar.
         $this->assertSame(1, $mes['pending']);
+        // Lo anulado no aparece por ningún lado del resumen.
+        $this->assertArrayNotHasKey('voided', $mes);
         $this->assertNotNull($sinCosto);
     }
 }
