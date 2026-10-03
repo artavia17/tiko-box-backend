@@ -418,6 +418,8 @@ class PackageController extends Controller
         return [
             'id' => $package->id,
             'tracking_number' => $package->tracking_number,
+            'voided' => $package->voided_at !== null,
+            'void_reason' => $package->void_reason,
             'courier' => $package->courier,
             'store' => $package->store,
             'description' => $package->description,

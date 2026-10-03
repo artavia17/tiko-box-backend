@@ -334,4 +334,49 @@ class FinanceTest extends TestCase
             'collected_by' => '  ',
         ])->assertJsonPath('data.collected_by', null);
     }
+
+    public function test_al_cliente_no_se_le_cobra_una_venta_anulada(): void
+    {
+        $admin = $this->signIn('admin');
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        $vigente = $this->package(['user_id' => $customer->id]);
+        $anulado = $this->package(['user_id' => $customer->id]);
+
+        $this->postJson("/api/staff/finances/packages/{$anulado->id}/void")->assertOk();
+
+        // Ahora mira el propio cliente.
+        $this->actingAs($customer);
+        $customer->withAccessToken($customer->createToken('app', ['*'])->accessToken);
+
+        $response = $this->getJson('/api/packages');
+
+        $response->assertOk();
+        // Los dos paquetes se siguen viendo...
+        $response->assertJsonCount(2, 'data');
+        // ...pero solo uno se le cobra.
+        $this->assertSame(1, $response->json('meta.pending_count'));
+        $this->assertEqualsWithDelta(65.00, $response->json('meta.pending_total'), 0.001);
+
+        $filas = collect($response->json('data'));
+        $this->assertTrue($filas->firstWhere('id', $anulado->id)['voided']);
+        $this->assertFalse($filas->firstWhere('id', $vigente->id)['voided']);
+        $this->assertNotNull($admin);
+    }
+
+    public function test_el_almacen_ve_que_un_paquete_esta_anulado(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->postJson("/api/staff/finances/packages/{$package->id}/void", [
+            'reason' => 'Se devolvió',
+        ])->assertOk();
+
+        $fila = collect($this->getJson('/api/staff/packages')->json('data'))
+            ->firstWhere('id', $package->id);
+
+        $this->assertTrue($fila['voided']);
+        $this->assertSame('Se devolvió', $fila['void_reason']);
+    }
 }
