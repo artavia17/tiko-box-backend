@@ -6,16 +6,17 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
-use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PackageController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PrealertController;
 use App\Http\Controllers\Api\Staff\AdminController;
 use App\Http\Controllers\Api\Staff\CatalogController;
 use App\Http\Controllers\Api\Staff\CustomerController;
-use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
+use App\Http\Controllers\Api\Staff\FinanceController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
-use App\Http\Controllers\Api\Staff\StaffPrealertController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
+use App\Http\Controllers\Api\Staff\StaffPrealertController;
+use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json([
@@ -74,6 +75,8 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::delete('/catalog/{option}', [CatalogController::class, 'destroy']);
     Route::get('/stats', [AdminController::class, 'stats']);
     Route::get('/today', [AdminController::class, 'today']);
+    Route::get('/finances', [FinanceController::class, 'index']);
+    Route::patch('/finances/packages/{package}/cost', [FinanceController::class, 'updateCost']);
     Route::get('/users', [StaffUserController::class, 'index']);
     Route::post('/users', [StaffUserController::class, 'store']);
     Route::put('/users/{user}', [StaffUserController::class, 'update']);

@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'exact_weight',
     'price_per_pound',
     'total',
+    'cost',
+    'exchange_rate',
     'original_total',
     'price_note',
     'price_adjusted_by',
