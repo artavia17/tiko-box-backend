@@ -89,6 +89,9 @@ class PackageController extends Controller
             'photos.*' => [File::types(['png', 'jpg', 'jpeg', 'webp'])->max(8192)],
             // Tarifa especial: se le cobra la libra más barata que de lista.
             'price_per_pound' => ['nullable', 'numeric', 'min:0.01'],
+            // Lo que el envío costó de verdad. Si todavía no se sabe, queda
+            // pendiente: inventarlo daría una ganancia que no es.
+            'cost' => ['nullable', 'numeric', 'min:0', 'max:100000'],
         ], [
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
@@ -123,7 +126,7 @@ class PackageController extends Controller
             : max($weight, (float) config('tikabox.minimum_weight_lb'));
 
         $total = round($billable * $pricePerPound, 2);
-        $cost = round($billable * (float) config('tikabox.cost_per_pound'), 2);
+        $cost = isset($data['cost']) ? round((float) $data['cost'], 2) : null;
         // Con tarifa especial se guarda lo que habría costado de lista, que es
         // lo que convierte esto en un descuento visible para el cliente.
         $list = $pricePerPound < $listRate ? round($billable * $listRate, 2) : null;
