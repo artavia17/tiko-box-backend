@@ -77,6 +77,8 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::get('/today', [AdminController::class, 'today']);
     Route::get('/finances', [FinanceController::class, 'index']);
     Route::patch('/finances/packages/{package}', [FinanceController::class, 'update']);
+    Route::post('/finances/packages/{package}/void', [FinanceController::class, 'void']);
+    Route::delete('/finances/packages/{package}/void', [FinanceController::class, 'restore']);
     Route::get('/users', [StaffUserController::class, 'index']);
     Route::post('/users', [StaffUserController::class, 'store']);
     Route::put('/users/{user}', [StaffUserController::class, 'update']);

@@ -22,6 +22,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'total',
     'cost',
     'exchange_rate',
+    'voided_at',
+    'voided_by',
+    'void_reason',
+    'collected_by',
     'original_total',
     'price_note',
     'price_adjusted_by',
@@ -38,6 +42,7 @@ class Package extends Model
     protected function casts(): array
     {
         return [
+            'voided_at' => 'datetime',
             'weight_lb' => 'float',
             'exact_weight' => 'boolean',
             'price_per_pound' => 'float',
