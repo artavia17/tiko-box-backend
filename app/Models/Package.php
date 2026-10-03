@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'registered_by',
     'prealert_id',
     'tracking_number',
+    'request_number',
     'courier',
     'store',
     'description',

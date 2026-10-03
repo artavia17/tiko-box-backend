@@ -379,4 +379,19 @@ class FinanceTest extends TestCase
         $this->assertTrue($fila['voided']);
         $this->assertSame('Se devolvió', $fila['void_reason']);
     }
+
+    public function test_se_anota_a_mano_el_numero_de_solicitud(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'request_number' => 'SH173530',
+        ])->assertJsonPath('data.request_number', 'SH173530');
+
+        // En blanco lo borra, no guarda una cadena vacía.
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'request_number' => '',
+        ])->assertJsonPath('data.request_number', null);
+    }
 }

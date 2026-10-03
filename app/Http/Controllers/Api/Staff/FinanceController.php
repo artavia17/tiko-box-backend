@@ -82,12 +82,17 @@ class FinanceController extends Controller
             'exchange_rate' => ['nullable', 'numeric', 'min:1', 'max:5000'],
             'total' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'collected_by' => ['nullable', 'string', 'max:80'],
+            'request_number' => ['nullable', 'string', 'max:60'],
         ]);
 
         $changes = [];
 
         if ($request->has('cost')) {
             $changes['cost'] = round((float) $data['cost'], 2);
+        }
+
+        if ($request->has('request_number')) {
+            $changes['request_number'] = trim((string) $data['request_number']) ?: null;
         }
 
         if ($request->has('collected_by')) {
@@ -199,6 +204,7 @@ class FinanceController extends Controller
         return [
             'id' => $package->id,
             'tracking_number' => $package->tracking_number,
+            'request_number' => $package->request_number,
             'customer' => $package->user?->fullName(),
             'locker_code' => $package->user?->locker_code,
             'weight_lb' => (float) $package->weight_lb,
