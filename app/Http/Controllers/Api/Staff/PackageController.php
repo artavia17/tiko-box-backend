@@ -79,6 +79,8 @@ class PackageController extends Controller
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
             'tracking_number' => ['required', 'string', 'max:60'],
+            // El número del proveedor, si ya se conoce al recibir el paquete.
+            'request_number' => ['nullable', 'string', 'max:60'],
             'weight_lb' => ['required', 'numeric', 'min:0.01', 'max:500'],
             // Envío consolidado: se cobra el peso tal cual, sin el mínimo.
             'exact_weight' => ['nullable', 'boolean'],
@@ -147,6 +149,7 @@ class PackageController extends Controller
                 'registered_by' => $request->user()->id,
                 'prealert_id' => $prealert?->id,
                 'tracking_number' => $tracking,
+                'request_number' => trim((string) ($data['request_number'] ?? '')) ?: null,
                 'courier' => $data['courier'] ?? null,
                 'store' => $data['store'] ?? null,
                 'description' => $data['description'] ?? null,
