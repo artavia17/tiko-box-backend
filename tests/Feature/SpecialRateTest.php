@@ -123,4 +123,26 @@ class SpecialRateTest extends TestCase
         // Pesa menos de una libra, así que se cobra una a la tarifa pactada.
         $this->assertEqualsWithDelta(4.00, (float) Package::first()->total, 0.001);
     }
+
+    public function test_el_numero_de_solicitud_se_guarda_al_registrar(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson('/api/staff/packages', $this->payload($customer, [
+            'request_number' => 'SH173530',
+        ]))->assertCreated();
+
+        $this->assertSame('SH173530', Package::first()->request_number);
+    }
+
+    public function test_sin_numero_de_solicitud_el_paquete_se_registra_igual(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson('/api/staff/packages', $this->payload($customer))->assertCreated();
+
+        $this->assertNull(Package::first()->request_number);
+    }
 }
