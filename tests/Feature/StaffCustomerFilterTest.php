@@ -124,4 +124,25 @@ class StaffCustomerFilterTest extends TestCase
 
         $this->assertSame([$otra->id], $ids->all());
     }
+
+    public function test_el_almacen_filtra_por_paquetes_activos(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->customerWithPackage('Aduanera', 'aduanas');
+        $this->customerWithPackage('Ruteada', 'en_ruta');
+        $this->customerWithPackage('Entregada', 'entregado');
+
+        $activos = $this->getJson('/api/staff/packages?status=activos')->json('data');
+        $this->assertCount(2, $activos);
+
+        // Un estado concreto sigue funcionando igual.
+        $this->assertCount(
+            1,
+            $this->getJson('/api/staff/packages?status=aduanas')->json('data')
+        );
+
+        // Y sin filtro vienen todos.
+        $this->assertCount(3, $this->getJson('/api/staff/packages')->json('data'));
+    }
 }

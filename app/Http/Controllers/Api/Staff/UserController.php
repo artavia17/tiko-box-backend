@@ -21,6 +21,9 @@ class UserController extends Controller
         $users = User::query()
             ->when(in_array($role, ['cliente', 'empleado', 'admin'], true),
                 fn ($query) => $query->where('role', $role))
+            // Para llenar la lista de quién cobró, sin traerse el directorio.
+            ->when($request->boolean('collectors'),
+                fn ($query) => $query->where('collects_payments', true))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     foreach (['name', 'email', 'identification', 'phone', 'locker_code'] as $field) {
@@ -58,11 +61,15 @@ class UserController extends Controller
             // Los permisos y el casillero son cosas distintas: quien
             // administra el negocio también compra.
             'receives_packages' => ['nullable', 'boolean'],
+            'collects_payments' => ['nullable', 'boolean'],
             'email_verified' => ['nullable', 'boolean'],
         ]);
 
         $user = User::create([
             ...collect($data)->except(['receives_packages', 'email_verified'])->all(),
+            // Un cliente no cobra paquetes aunque llegue marcado.
+            'collects_payments' => $data['role'] !== 'cliente'
+                && filter_var($data['collects_payments'] ?? false, FILTER_VALIDATE_BOOL),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
             'locker_code' => $this->lockerFor($data),
         ]);
@@ -88,6 +95,7 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['cliente', 'empleado', 'admin'])],
             'password' => ['nullable', 'string', 'min:8'],
             'receives_packages' => ['nullable', 'boolean'],
+            'collects_payments' => ['nullable', 'boolean'],
             'email_verified' => ['nullable', 'boolean'],
         ]);
 
@@ -95,6 +103,8 @@ class UserController extends Controller
 
         $user->update([
             ...collect($data)->except(['password', 'receives_packages', 'email_verified'])->all(),
+            'collects_payments' => $data['role'] !== 'cliente'
+                && filter_var($data['collects_payments'] ?? false, FILTER_VALIDATE_BOOL),
             'name' => trim("{$data['first_name']} {$data['last_name']}"),
             'locker_code' => $this->lockerFor($data, $user),
             ...(filled($data['password'] ?? null) ? ['password' => $data['password']] : []),
@@ -186,6 +196,7 @@ class UserController extends Controller
             'role' => $user->role,
             'locker_code' => $user->locker_code,
             'receives_packages' => $user->isCustomer(),
+            'collects_payments' => (bool) $user->collects_payments,
             'packages_count' => $user->packages_count ?? 0,
             'email_verified' => $user->hasVerifiedEmail(),
             'created_at' => $user->created_at?->toDateString(),
