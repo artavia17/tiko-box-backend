@@ -53,7 +53,14 @@ class PackageController extends Controller
             // Desde la ficha de un cliente se llega con su id, que no depende
             // de cómo esté escrito su nombre.
             ->when($request->query('customer'), fn ($query, $id) => $query->where('user_id', $id))
-            ->when($request->query('status'), fn ($query, string $status) => $query->where('status', $status))
+            // "activos" es todo lo que sigue en movimiento: lo que el almacén
+            // mira la mayor parte del tiempo.
+            ->when($request->query('status') === 'activos',
+                fn ($query) => $query->whereIn('status', PackageTracker::openStatuses()))
+            ->when(
+                in_array($request->query('status'), PackageTracker::statuses(), true),
+                fn ($query) => $query->where('status', $request->query('status')),
+            )
             ->latest()
             ->paginate((int) $request->query('per_page', 20));
 

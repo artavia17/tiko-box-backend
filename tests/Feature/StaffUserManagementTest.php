@@ -126,4 +126,49 @@ class StaffUserManagementTest extends TestCase
         $this->postJson('/api/staff/users', $this->payload())->assertForbidden();
         $this->getJson('/api/staff/users')->assertForbidden();
     }
+
+    public function test_se_marca_quien_del_personal_cobra_paquetes(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/staff/users', $this->payload([
+            'role' => 'empleado',
+            'collects_payments' => true,
+        ]))->assertCreated()->assertJsonPath('data.collects_payments', true);
+
+        $this->assertTrue(
+            User::where('email', 'diego@example.com')->first()->collects_payments
+        );
+    }
+
+    public function test_un_cliente_nunca_queda_marcado_como_cobrador(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/staff/users', $this->payload([
+            'role' => 'cliente',
+            'collects_payments' => true,
+        ]))->assertCreated()->assertJsonPath('data.collects_payments', false);
+    }
+
+    public function test_la_lista_se_puede_filtrar_a_los_que_cobran(): void
+    {
+        $this->actingAsAdmin();
+
+        $cobra = User::factory()->create([
+            'role' => 'admin',
+            'collects_payments' => true,
+            'name' => 'Henry Porras',
+        ]);
+        User::factory()->create([
+            'role' => 'admin',
+            'collects_payments' => false,
+            'name' => 'Otro Admin',
+        ]);
+
+        $ids = collect($this->getJson('/api/staff/users?collectors=1')->json('data'))
+            ->pluck('id');
+
+        $this->assertSame([$cobra->id], $ids->all());
+    }
 }

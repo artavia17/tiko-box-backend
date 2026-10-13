@@ -25,6 +25,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'password',
     'role',
+    'collects_payments',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -40,6 +41,7 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'collects_payments' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
