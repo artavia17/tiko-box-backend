@@ -145,4 +145,73 @@ class SpecialRateTest extends TestCase
 
         $this->assertNull(Package::first()->request_number);
     }
+
+    public function test_hacerle_precio_despues_usa_la_misma_tarifa_por_libra(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson('/api/staff/packages', $this->payload($customer))->assertCreated();
+        $package = Package::first();
+
+        $this->patchJson("/api/staff/packages/{$package->id}/price", [
+            'price_per_pound' => 4,
+        ])->assertOk();
+
+        $package->refresh();
+
+        // 10 lb a $4 en vez de $6.50.
+        $this->assertEqualsWithDelta(40.00, (float) $package->total, 0.001);
+        $this->assertEqualsWithDelta(65.00, (float) $package->original_total, 0.001);
+        $this->assertEqualsWithDelta(4.00, (float) $package->price_per_pound, 0.001);
+    }
+
+    public function test_al_hacer_precio_tampoco_se_puede_cobrar_mas_que_la_lista(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson('/api/staff/packages', $this->payload($customer))->assertCreated();
+        $package = Package::first();
+
+        $this->patchJson("/api/staff/packages/{$package->id}/price", [
+            'price_per_pound' => 9,
+        ])->assertJsonValidationErrors('price_per_pound');
+    }
+
+    public function test_hacer_precio_respeta_el_minimo_de_una_libra(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+
+        $this->postJson(
+            '/api/staff/packages',
+            $this->payload($customer, ['weight_lb' => 0.4])
+        )->assertCreated();
+
+        $package = Package::first();
+
+        $this->patchJson("/api/staff/packages/{$package->id}/price", [
+            'price_per_pound' => 4,
+        ])->assertOk();
+
+        // Pesa menos de una libra: se cobra una a la tarifa pactada.
+        $this->assertEqualsWithDelta(4.00, (float) $package->fresh()->total, 0.001);
+    }
+
+    public function test_un_empleado_no_puede_hacerle_precio_a_un_paquete(): void
+    {
+        $this->signIn('admin');
+        $customer = $this->customer();
+        $this->postJson('/api/staff/packages', $this->payload($customer))->assertCreated();
+        $package = Package::first();
+
+        $employee = User::factory()->create(['role' => 'empleado']);
+        $this->actingAs($employee);
+        $employee->withAccessToken($employee->createToken('test', ['staff'])->accessToken);
+
+        $this->patchJson("/api/staff/packages/{$package->id}/price", [
+            'price_per_pound' => 4,
+        ])->assertForbidden();
+    }
 }

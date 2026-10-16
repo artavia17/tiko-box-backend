@@ -145,4 +145,54 @@ class StaffCustomerFilterTest extends TestCase
         // Y sin filtro vienen todos.
         $this->assertCount(3, $this->getJson('/api/staff/packages')->json('data'));
     }
+
+    public function test_se_busca_un_paquete_por_su_numero_de_solicitud(): void
+    {
+        $this->actingAsAdmin();
+
+        $customer = User::factory()->create(['role' => 'cliente', 'name' => 'Ana Mora']);
+
+        Package::create([
+            'user_id' => $customer->id,
+            'tracking_number' => 'TBA999',
+            'request_number' => 'SH173530',
+            'weight_lb' => 2,
+            'price_per_pound' => 6.5,
+            'total' => 13,
+            'status' => 'recibido',
+            'received_at' => now(),
+        ]);
+
+        $this->customerWithPackage('Otra', 'recibido');
+
+        $paquetes = $this->getJson('/api/staff/packages?search=SH173530')->json('data');
+
+        $this->assertCount(1, $paquetes);
+        $this->assertSame('SH173530', $paquetes[0]['request_number']);
+    }
+
+    public function test_se_llega_al_cliente_por_el_numero_de_solicitud(): void
+    {
+        $this->actingAsAdmin();
+
+        $duenio = User::factory()->create(['role' => 'cliente', 'name' => 'Ana Mora']);
+
+        Package::create([
+            'user_id' => $duenio->id,
+            'tracking_number' => 'TBA999',
+            'request_number' => 'SH173530',
+            'weight_lb' => 2,
+            'price_per_pound' => 6.5,
+            'total' => 13,
+            'status' => 'recibido',
+            'received_at' => now(),
+        ]);
+
+        $this->customerWithPackage('Otra', 'recibido');
+
+        $ids = collect($this->getJson('/api/staff/customers?search=SH173530')->json('data'))
+            ->pluck('id');
+
+        $this->assertSame([$duenio->id], $ids->all());
+    }
 }
