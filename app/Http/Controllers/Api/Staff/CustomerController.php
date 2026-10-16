@@ -31,6 +31,15 @@ class CustomerController extends Controller
                     foreach (['locker_code', 'name', 'identification', 'email', 'phone'] as $field) {
                         $q->orWhere($field, 'like', "%{$search}%");
                     }
+
+                    // Con un número de solicitud o de rastreo en la mano se
+                    // llega al dueño sin saber cómo se llama.
+                    $q->orWhereHas('packages', function ($packages) use ($search) {
+                        $packages->where(function ($inner) use ($search) {
+                            $inner->where('request_number', 'like', "%{$search}%")
+                                ->orWhere('tracking_number', 'like', "%{$search}%");
+                        });
+                    });
                 });
             })
             // Quién tiene algo todavía en movimiento, o parado en un punto
