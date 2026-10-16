@@ -423,4 +423,25 @@ class FinanceTest extends TestCase
         $this->assertArrayNotHasKey('pending', $mes);
         $this->assertNotNull($sinCosto);
     }
+
+    public function test_propone_el_costo_segun_la_tarifa_pero_no_lo_guarda(): void
+    {
+        $this->signIn('admin');
+        $this->package(['weight_lb' => 1.05, 'cost' => null]);
+
+        $fila = $this->getJson('/api/staff/finances')->json('data.rows.0');
+
+        // 1.05 lb × la tarifa configurada.
+        $this->assertEqualsWithDelta(
+            round(1.05 * config('tikabox.cost_per_pound'), 2),
+            $fila['suggested_cost'],
+            0.001,
+        );
+
+        // La propuesta no se guarda: el paquete sigue sin costo hasta que
+        // alguien lo confirme.
+        $this->assertNull($fila['cost']);
+        $this->assertNull($fila['profit']);
+        $this->assertSame(1, $this->getJson('/api/staff/finances')->json('data.pending'));
+    }
 }

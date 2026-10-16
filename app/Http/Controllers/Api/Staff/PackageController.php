@@ -154,6 +154,11 @@ class PackageController extends Controller
 
             $prealert?->update(['status' => 'recibido']);
 
+            // La ventana de la consolidación arranca con el primer paquete que
+            // llega, no cuando el cliente la creó: si se contara desde antes,
+            // el plazo correría mientras todavía no había nada que esperar.
+            $prealert?->consolidation?->activateOnFirstArrival();
+
             return Package::create([
                 'user_id' => $customer->id,
                 'registered_by' => $request->user()->id,
