@@ -31,6 +31,24 @@ return [
     /** Nada se cobra por debajo de esto, aunque pese menos. */
     'minimum_weight_lb' => (float) env('MINIMUM_WEIGHT_LB', 1),
 
+    /**
+     * Lo que nos cuesta la libra puesta en Costa Rica. No se guarda solo en
+     * ningún paquete: solo sirve para proponerle el número a quien costea,
+     * que lo confirma o lo corrige. El costo real siempre lo digita alguien.
+     */
+    'cost_per_pound' => (float) env('COST_PER_POUND', 3.5),
+
+    /**
+     * Consolidaciones: días que se esperan los paquetes desde que llega el
+     * primero, y con cuántas horas de antelación se avisa que está por vencer.
+     */
+    'consolidation' => [
+        'window_days' => (int) env('CONSOLIDATION_WINDOW_DAYS', 10),
+        'expiring_soon_hours' => (int) env('CONSOLIDATION_EXPIRING_SOON_HOURS', 48),
+        'min_prealerts' => 2,
+        'max_prealerts' => 10,
+    ],
+
     /** Colones por dólar. Cada paquete guarda el que tenía al registrarse. */
     'exchange_rate' => (float) env('EXCHANGE_RATE', 466),
 

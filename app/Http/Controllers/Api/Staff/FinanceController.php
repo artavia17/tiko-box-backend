@@ -210,6 +210,13 @@ class FinanceController extends Controller
             'customer' => $package->user?->fullName(),
             'locker_code' => $package->user?->locker_code,
             'weight_lb' => (float) $package->weight_lb,
+            // Lo que debería costar según la tarifa: es una propuesta para el
+            // campo, no un costo guardado. Quien costea la confirma o la pisa.
+            'suggested_cost' => round(
+                (float) $package->weight_lb * (float) config('tikabox.cost_per_pound'),
+                2,
+            ),
+            'cost_rate' => (float) config('tikabox.cost_per_pound'),
             'cost' => $cost,
             'revenue' => $revenue,
             'profit' => $profit,
