@@ -39,6 +39,9 @@ class PackageController extends Controller
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('tracking_number', 'like', "%{$search}%")
+                        // El número del proveedor: a veces es el único dato
+                        // que trae quien pregunta por un paquete.
+                        ->orWhere('request_number', 'like', "%{$search}%")
                         // Los OR van agrupados: sueltos se mezclarían con la
                         // correlación de la subconsulta y traerían todo.
                         ->orWhereHas('user', function ($u) use ($search) {
@@ -276,6 +279,16 @@ class PackageController extends Controller
      *
      * @param  array<string, mixed>  $data
      */
+    /** Las libras que se cobran: el mínimo aplica salvo envío consolidado. */
+    private function billableWeight(Package $package): float
+    {
+        $weight = (float) $package->weight_lb;
+
+        return $package->exact_weight
+            ? $weight
+            : max($weight, (float) config('tikabox.minimum_weight_lb'));
+    }
+
     private function rateFor(Request $request, array $data, float $listRate): float
     {
         $rate = $data['price_per_pound'] ?? null;
@@ -302,23 +315,27 @@ class PackageController extends Controller
         abort_unless($request->user()->isAdmin(), 403, 'Solo administración cambia el precio.');
 
         $data = $request->validate([
-            'total' => ['required', 'numeric', 'min:0', 'max:100000'],
-            'note' => ['required', 'string', 'max:200'],
-        ], [
-            'note.required' => 'Escribí por qué se le hace precio.',
+            'price_per_pound' => ['required', 'numeric', 'min:0.01'],
         ]);
 
         if ($package->status === 'entregado') {
             throw ValidationException::withMessages([
-                'total' => 'Este paquete ya se entregó y se cobró.',
+                'price_per_pound' => 'Este paquete ya se entregó y se cobró.',
             ]);
         }
 
+        // El mismo camino que al registrar: se hace precio bajando la tarifa
+        // por libra, no fijando un total a mano. Dos formas de hacer lo mismo
+        // dan dos resultados distintos en cuanto alguien se equivoca.
+        $listRate = (float) config('tikabox.price_per_pound');
+        $rate = $this->rateFor($request, $data, $listRate);
+        $billable = $this->billableWeight($package);
+
         $package->update([
-            // La primera vez se guarda lo que daba la tarifa; después no se pisa.
-            'original_total' => $package->original_total ?? $package->total,
-            'total' => round((float) $data['total'], 2),
-            'price_note' => $data['note'],
+            'price_per_pound' => $rate,
+            'total' => round($billable * $rate, 2),
+            // Lo que habría costado de lista es lo que el cliente ve tachado.
+            'original_total' => $rate < $listRate ? round($billable * $listRate, 2) : null,
             'price_adjusted_by' => $request->user()->id,
             'price_adjusted_at' => now(),
         ]);
@@ -428,6 +445,7 @@ class PackageController extends Controller
         return [
             'id' => $package->id,
             'tracking_number' => $package->tracking_number,
+            'request_number' => $package->request_number,
             'voided' => $package->voided_at !== null,
             'void_reason' => $package->void_reason,
             'courier' => $package->courier,
