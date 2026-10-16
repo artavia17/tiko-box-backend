@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AvailabilityController;
+use App\Http\Controllers\Api\ConsolidationController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use App\Http\Controllers\Api\PackageController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PrealertController;
 use App\Http\Controllers\Api\Staff\AdminController;
 use App\Http\Controllers\Api\Staff\CatalogController;
+use App\Http\Controllers\Api\Staff\ConsolidationController as StaffConsolidationController;
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\FinanceController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
@@ -62,6 +64,11 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     Route::get('/catalog', [CatalogController::class, 'index']);
     Route::get('/packages', [StaffPackageController::class, 'index']);
     Route::post('/packages', [StaffPackageController::class, 'store']);
+
+    // Cerrar un consolidado es trabajo de bodega: es quien sabe qué llegó y
+    // cuánto pesa el bulto junto.
+    Route::get('/consolidations', [StaffConsolidationController::class, 'index']);
+    Route::post('/consolidations/{consolidation}/process', [StaffConsolidationController::class, 'process']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
     Route::post('/packages/{package}/deliver', [StaffPackageController::class, 'deliver']);
     Route::patch('/packages/{package}/price', [StaffPackageController::class, 'adjustPrice']);
@@ -94,6 +101,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/locker', [LockerController::class, 'show']);
+
+    // El catálogo de transportistas que administra el almacén, para que el
+    // cliente elija de la misma lista y no de una quemada en la pantalla.
+    Route::get('/couriers', [PrealertController::class, 'couriers']);
+
+    // Consolidaciones del cliente.
+    Route::get('/consolidations', [ConsolidationController::class, 'index']);
+    Route::post('/consolidations', [ConsolidationController::class, 'store']);
+    Route::get('/consolidations/{consolidation}', [ConsolidationController::class, 'show']);
+    Route::delete('/consolidations/{consolidation}', [ConsolidationController::class, 'destroy']);
+    Route::post('/consolidations/{consolidation}/prealerts', [ConsolidationController::class, 'addPrealert']);
+    Route::delete('/consolidations/{consolidation}/prealerts/{prealert}', [ConsolidationController::class, 'removePrealert']);
+    Route::post('/consolidations/{consolidation}/request', [ConsolidationController::class, 'request']);
 
     // Ajustes de la cuenta
     Route::patch('/me', [AccountController::class, 'update']);

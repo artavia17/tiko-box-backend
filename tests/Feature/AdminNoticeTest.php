@@ -82,6 +82,8 @@ class AdminNoticeTest extends TestCase
         $this->post('/api/prealerts', [
             'tracking_number' => 'TBA123456789',
             'origin' => 'Miami',
+            'courier' => 'Amazon Logistics',
+            'items' => [['quantity' => 1, 'description' => 'Camisa', 'amount' => 25.5]],
             'invoice' => UploadedFile::fake()->create('factura.pdf', 40, 'application/pdf'),
         ])->assertCreated();
 
