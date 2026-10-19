@@ -6,6 +6,8 @@ use App\Models\Prealert;
 use App\Models\PrealertItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -55,5 +57,27 @@ class StaffPrealertDetailTest extends TestCase
 
         // 2 × $30: el valor declarado es lo que aduana cobra.
         $this->assertEqualsWithDelta(60, $fila['declared_value'], 0.001);
+    }
+
+    public function test_se_puede_prealertar_sin_declarar_el_contenido(): void
+    {
+        $customer = User::factory()->create(['role' => 'cliente']);
+        $this->actingAs($customer);
+        $customer->withAccessToken($customer->createToken('app', ['*'])->accessToken);
+
+        Storage::fake('local');
+
+        $this->post('/api/prealerts', [
+            'tracking_number' => 'TBA555',
+            'courier' => 'Amazon Logistics',
+            'invoice' => UploadedFile::fake()
+                ->create('factura.pdf', 40, 'application/pdf'),
+        ])->assertCreated();
+
+        $prealert = Prealert::where('tracking_number', 'TBA555')->first();
+
+        $this->assertNotNull($prealert);
+        $this->assertCount(0, $prealert->items);
+        $this->assertEqualsWithDelta(0, $prealert->declaredValue(), 0.001);
     }
 }
