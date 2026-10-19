@@ -92,21 +92,6 @@ class ConsolidationTest extends TestCase
         $this->assertNull($ajena->fresh()->consolidation_id);
     }
 
-    public function test_un_paquete_retenido_no_se_consolida(): void
-    {
-        $customer = $this->signIn();
-
-        $this->postJson('/api/consolidations', [
-            'prealert_ids' => [
-                $this->prealert($customer)->id,
-                $this->prealert($customer, [
-                    'is_retained' => true,
-                    'retention_note' => 'Esperando otra compra',
-                ])->id,
-            ],
-        ])->assertJsonValidationErrors('prealert_ids');
-    }
-
     public function test_una_prealerta_no_puede_estar_en_dos_consolidaciones(): void
     {
         $customer = $this->signIn();

@@ -221,13 +221,6 @@ class ConsolidationController extends Controller
                 'prealert_ids' => 'Alguna de esas prealertas ya está en otra consolidación.',
             ]);
         }
-
-        // Retener es no despachar; consolidar es despachar junto. No conviven.
-        if ($prealerts->firstWhere('is_retained', true)) {
-            throw ValidationException::withMessages([
-                'prealert_ids' => 'No podés consolidar y retener un paquete al mismo tiempo.',
-            ]);
-        }
     }
 
     private function authorizeOwner(Request $request, Consolidation $consolidation): void

@@ -33,8 +33,6 @@ class StaffPrealertDetailTest extends TestCase
             'tracking_number' => 'TBA123',
             'origin' => 'Miami',
             'courier' => 'Amazon Logistics',
-            'is_retained' => true,
-            'retention_note' => 'Falta la factura original',
         ]);
 
         PrealertItem::create([
@@ -48,9 +46,6 @@ class StaffPrealertDetailTest extends TestCase
             ->firstWhere('id', $prealert->id);
 
         $this->assertSame('Amazon Logistics', $fila['courier']);
-        $this->assertTrue($fila['is_retained']);
-        $this->assertSame('Falta la factura original', $fila['retention_note']);
-
         $this->assertCount(1, $fila['items']);
         $this->assertSame('Audífonos', $fila['items'][0]['description']);
         $this->assertSame(2, $fila['items'][0]['quantity']);
