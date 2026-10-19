@@ -65,9 +65,7 @@ class PrealertController extends Controller
     {
         $data = $this->validated($request);
 
-        $retained = filter_var($data['is_retained'] ?? false, FILTER_VALIDATE_BOOL);
-
-        $prealert = DB::transaction(function () use ($request, $data, $retained) {
+        $prealert = DB::transaction(function () use ($request, $data) {
             $prealert = Prealert::create([
                 'user_id' => $request->user()->id,
                 'tracking_number' => $this->normalizeTracking($data['tracking_number']),
@@ -75,8 +73,6 @@ class PrealertController extends Controller
                 'invoice_path' => $this->storeInvoice($request->file('invoice'), $request->user()->id),
                 'origin' => $data['origin'] ?? 'Miami',
                 'expected_arrival' => $data['expected_arrival'] ?? null,
-                'is_retained' => $retained,
-                'retention_note' => $retained ? $data['retention_note'] : null,
             ]);
 
             $this->saveItems($prealert, $data['items'] ?? []);
@@ -100,16 +96,11 @@ class PrealertController extends Controller
         $invoice = $request->file('invoice');
         $previous = $prealert->invoice_path;
 
-        $retained = filter_var($data['is_retained'] ?? false, FILTER_VALIDATE_BOOL);
-
-        DB::transaction(function () use ($prealert, $data, $invoice, $retained) {
+        DB::transaction(function () use ($prealert, $data, $invoice) {
             $prealert->update([
                 'tracking_number' => $this->normalizeTracking($data['tracking_number']),
                 'courier' => $data['courier'],
                 'expected_arrival' => $data['expected_arrival'] ?? null,
-                'is_retained' => $retained,
-                // Al quitar la retención, el motivo deja de aplicar.
-                'retention_note' => $retained ? $data['retention_note'] : null,
                 // Si no mandan una factura nueva, se conserva la que ya estaba.
                 ...($invoice ? ['invoice_path' => $this->storeInvoice($invoice, $prealert->user_id)] : []),
             ]);
@@ -228,15 +219,12 @@ class PrealertController extends Controller
                 'before_or_equal:'.now()->addDays(180)->toDateString(),
             ]),
 
-            'is_retained' => ['nullable', 'boolean'],
-            'retention_note' => ['nullable', 'required_if:is_retained,1,true', 'string', 'max:500'],
         ], [
             'tracking_number.unique' => 'Ya tenés una prealerta con ese número de rastreo.',
             'courier.required' => 'Elegí quién trae el paquete a Miami.',
             'items.*.description.required' => 'Escribí qué viene en el paquete.',
             'items.*.amount.gt' => 'El valor del artículo tiene que ser mayor que cero.',
             'expected_arrival.after_or_equal' => 'La fecha de llegada no puede ser anterior a hoy.',
-            'retention_note.required_if' => 'Escribí por qué se retiene el paquete.',
             'invoice.required' => 'Subí la factura de la compra.',
             'invoice.mimes' => 'La factura debe ser un PDF o una imagen PNG, WEBP o JPG.',
             'invoice.max' => 'La factura no puede pesar más de 8 MB.',
@@ -294,8 +282,6 @@ class PrealertController extends Controller
             'origin' => $prealert->origin,
             'courier' => $prealert->courier,
             'expected_arrival' => $prealert->expected_arrival?->toDateString(),
-            'is_retained' => (bool) $prealert->is_retained,
-            'retention_note' => $prealert->retention_note,
             'items' => $prealert->items->map(fn ($item) => [
                 'quantity' => $item->quantity,
                 'description' => $item->description,

@@ -83,8 +83,6 @@ class StaffPrealertController extends Controller
                 'subtotal' => $item->subtotal(),
             ])->values(),
             'declared_value' => $prealert->declaredValue(),
-            'is_retained' => (bool) $prealert->is_retained,
-            'retention_note' => $prealert->retention_note,
             'status' => $prealert->status,
             'has_invoice' => (bool) $prealert->invoice_path,
             'invoice_type' => $prealert->invoice_path

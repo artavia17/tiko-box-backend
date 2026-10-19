@@ -113,47 +113,6 @@ class PrealertDetailTest extends TestCase
         ]))->assertJsonValidationErrors('expected_arrival');
     }
 
-    public function test_retener_exige_decir_por_que(): void
-    {
-        $this->signIn();
-
-        $this->post('/api/prealerts', $this->payload(['is_retained' => true]))
-            ->assertJsonValidationErrors('retention_note');
-    }
-
-    public function test_una_prealerta_retenida_guarda_su_motivo(): void
-    {
-        $this->signIn();
-
-        $this->post('/api/prealerts', $this->payload([
-            'is_retained' => true,
-            'retention_note' => 'Espero otra compra para juntarlas',
-        ]))
-            ->assertCreated()
-            ->assertJsonPath('data.is_retained', true)
-            ->assertJsonPath('data.retention_note', 'Espero otra compra para juntarlas');
-    }
-
-    public function test_quitar_la_retencion_borra_el_motivo(): void
-    {
-        $this->signIn();
-
-        $this->post('/api/prealerts', $this->payload([
-            'is_retained' => true,
-            'retention_note' => 'Por ahora no',
-        ]))->assertCreated();
-
-        $prealert = Prealert::first();
-
-        $this->post("/api/prealerts/{$prealert->id}", $this->payload([
-            '_method' => 'PUT',
-            'is_retained' => false,
-            'invoice' => null,
-        ]))->assertOk()->assertJsonPath('data.retention_note', null);
-
-        $this->assertFalse($prealert->fresh()->is_retained);
-    }
-
     public function test_editar_conserva_una_fecha_que_ya_paso(): void
     {
         $customer = $this->signIn();

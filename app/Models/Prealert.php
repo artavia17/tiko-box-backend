@@ -13,8 +13,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'consolidation_id',
     'tracking_number',
     'courier',
-    'is_retained',
-    'retention_note',
     'invoice_path',
     'origin',
     'expected_arrival',
@@ -26,7 +24,6 @@ class Prealert extends Model
     {
         return [
             'expected_arrival' => 'date',
-            'is_retained' => 'boolean',
         ];
     }
 
