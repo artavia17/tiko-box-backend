@@ -26,7 +26,7 @@ class StaffPrealertController extends Controller
             'undated' => ['nullable', 'boolean'],
         ]);
 
-        $prealerts = Prealert::with('user')
+        $prealerts = Prealert::with(['user', 'items'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('tracking_number', 'like', "%{$search}%")
@@ -70,7 +70,21 @@ class StaffPrealertController extends Controller
             'id' => $prealert->id,
             'tracking_number' => $prealert->tracking_number,
             'origin' => $prealert->origin,
+            // Quién lo trae a Miami: el almacén lo necesita para saber a
+            // quién reclamarle si no aparece.
+            'courier' => $prealert->courier,
             'expected_arrival' => $prealert->expected_arrival?->toDateString(),
+            // Lo que el cliente declaró que viene adentro. Es lo que aduana
+            // usa, así que el almacén tiene que verlo tal cual se declaró.
+            'items' => $prealert->items->map(fn ($item) => [
+                'quantity' => $item->quantity,
+                'description' => $item->description,
+                'amount' => $item->amount,
+                'subtotal' => $item->subtotal(),
+            ])->values(),
+            'declared_value' => $prealert->declaredValue(),
+            'is_retained' => (bool) $prealert->is_retained,
+            'retention_note' => $prealert->retention_note,
             'status' => $prealert->status,
             'has_invoice' => (bool) $prealert->invoice_path,
             'invoice_type' => $prealert->invoice_path
