@@ -70,12 +70,19 @@ class PrealertDetailTest extends TestCase
             ->assertJsonPath('data.tracking_number', 'TBA999');
     }
 
-    public function test_no_se_acepta_una_prealerta_sin_articulos(): void
+    /**
+     * Declarar el contenido pasó a ser opcional: mucha gente prealerta apenas
+     * compra, cuando todavía no tiene el detalle a mano. Lo que sigue sin
+     * aceptarse es una línea a medio llenar, que es un error y no una
+     * ausencia.
+     */
+    public function test_se_acepta_una_prealerta_sin_articulos(): void
     {
         $this->signIn();
 
         $this->post('/api/prealerts', $this->payload(['items' => []]))
-            ->assertJsonValidationErrors('items');
+            ->assertCreated()
+            ->assertJsonPath('data.declared_value', 0);
     }
 
     public function test_un_articulo_sin_valor_se_rechaza(): void

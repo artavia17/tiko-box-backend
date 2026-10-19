@@ -79,7 +79,7 @@ class PrealertController extends Controller
                 'retention_note' => $retained ? $data['retention_note'] : null,
             ]);
 
-            $this->saveItems($prealert, $data['items']);
+            $this->saveItems($prealert, $data['items'] ?? []);
 
             return $prealert;
         });
@@ -114,7 +114,7 @@ class PrealertController extends Controller
                 ...($invoice ? ['invoice_path' => $this->storeInvoice($invoice, $prealert->user_id)] : []),
             ]);
 
-            $this->saveItems($prealert, $data['items']);
+            $this->saveItems($prealert, $data['items'] ?? []);
         });
 
         if ($invoice && $previous) {
@@ -209,8 +209,10 @@ class PrealertController extends Controller
             'courier' => ['required', 'string', 'max:60'],
 
             // El contenido declarado: es lo que aduana usa para calcular
-            // impuestos sin aforar el paquete a ojo.
-            'items' => ['required', 'array', 'min:1', 'max:50'],
+            // impuestos sin aforar el paquete a ojo. Se pide, pero no se
+            // obliga: muchos clientes prealertan apenas compran, cuando
+            // todavía no tienen el detalle a mano.
+            'items' => ['nullable', 'array', 'max:50'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:9999'],
             'items.*.description' => ['required', 'string', 'max:200'],
             'items.*.amount' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
@@ -231,8 +233,6 @@ class PrealertController extends Controller
         ], [
             'tracking_number.unique' => 'Ya tenés una prealerta con ese número de rastreo.',
             'courier.required' => 'Elegí quién trae el paquete a Miami.',
-            'items.required' => 'Agregá al menos un artículo.',
-            'items.min' => 'Agregá al menos un artículo.',
             'items.*.description.required' => 'Escribí qué viene en el paquete.',
             'items.*.amount.gt' => 'El valor del artículo tiene que ser mayor que cero.',
             'expected_arrival.after_or_equal' => 'La fecha de llegada no puede ser anterior a hoy.',
@@ -269,7 +269,8 @@ class PrealertController extends Controller
      * Reemplaza el contenido declarado.
      *
      * Se borra y se vuelve a escribir en vez de ir casando línea por línea:
-     * son pocos renglones y el cliente los edita como un bloque.
+     * son pocos renglones y el cliente los edita como un bloque. Sin
+     * renglones queda sin contenido declarado, que ahora es válido.
      *
      * @param  array<int, array<string, mixed>>  $items
      */
