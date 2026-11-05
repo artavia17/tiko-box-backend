@@ -56,6 +56,13 @@ class PackageController extends Controller
             // Desde la ficha de un cliente se llega con su id, que no depende
             // de cómo esté escrito su nombre.
             ->when($request->query('customer'), fn ($query, $id) => $query->where('user_id', $id))
+            // Lo anulado vive aparte, como una papelera: no aparece mezclado
+            // con lo que el almacén tiene que mover, porque ya no se mueve.
+            ->when(
+                $request->query('status') === 'anulados',
+                fn ($query) => $query->whereNotNull('voided_at'),
+                fn ($query) => $query->whereNull('voided_at'),
+            )
             // "activos" es todo lo que sigue en movimiento: lo que el almacén
             // mira la mayor parte del tiempo.
             ->when($request->query('status') === 'activos',
@@ -73,6 +80,12 @@ class PackageController extends Controller
                 'current_page' => $packages->currentPage(),
                 'last_page' => $packages->lastPage(),
                 'total' => $packages->total(),
+                // Para que la papelera muestre cuántos hay sin tener que
+                // entrar a verla.
+                'voided_total' => Package::whereNotNull('voided_at')
+                    ->when($request->query('customer'),
+                        fn ($query, $id) => $query->where('user_id', $id))
+                    ->count(),
             ],
         ]);
     }

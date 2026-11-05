@@ -373,7 +373,13 @@ class FinanceTest extends TestCase
             'reason' => 'Se devolvió',
         ])->assertOk();
 
-        $fila = collect($this->getJson('/api/staff/packages')->json('data'))
+        // La lista normal ya no lo trae: vive en la papelera.
+        $this->assertNull(
+            collect($this->getJson('/api/staff/packages')->json('data'))
+                ->firstWhere('id', $package->id),
+        );
+
+        $fila = collect($this->getJson('/api/staff/packages?status=anulados')->json('data'))
             ->firstWhere('id', $package->id);
 
         $this->assertTrue($fila['voided']);
@@ -443,5 +449,32 @@ class FinanceTest extends TestCase
         $this->assertNull($fila['cost']);
         $this->assertNull($fila['profit']);
         $this->assertSame(1, $this->getJson('/api/staff/finances')->json('data.pending'));
+    }
+
+    public function test_un_paquete_anulado_no_sale_entre_los_activos(): void
+    {
+        $this->signIn('admin');
+
+        $vigente = $this->package();
+        $anulado = $this->package();
+
+        $this->postJson("/api/staff/finances/packages/{$anulado->id}/void")->assertOk();
+
+        $activos = collect($this->getJson('/api/staff/packages?status=activos')->json('data'))
+            ->pluck('id');
+
+        $this->assertSame([$vigente->id], $activos->all());
+
+        // Tampoco entre todos: la papelera es un lugar aparte.
+        $todos = collect($this->getJson('/api/staff/packages')->json('data'))->pluck('id');
+        $this->assertSame([$vigente->id], $todos->all());
+
+        // Y en la papelera está solo el anulado.
+        $papelera = $this->getJson('/api/staff/packages?status=anulados');
+        $this->assertSame(
+            [$anulado->id],
+            collect($papelera->json('data'))->pluck('id')->all(),
+        );
+        $this->assertSame(1, $papelera->json('meta.voided_total'));
     }
 }
