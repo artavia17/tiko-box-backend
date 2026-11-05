@@ -33,7 +33,10 @@ class PackageController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $packages = Package::with(self::CUSTOMER_RELATIONS)
+        // Lo que acota a qué paquetes se está mirando, sin el estado: lo
+        // comparten la lista y el contador de la papelera, para que el número
+        // del chip hable de los mismos paquetes que la búsqueda.
+        $scoped = fn () => Package::query()
             // El casillero es el mismo para todos, así que no sirve para
             // buscar: se identifica al cliente por sus datos.
             ->when($request->query('search'), function ($query, string $search) {
@@ -55,7 +58,10 @@ class PackageController extends Controller
             })
             // Desde la ficha de un cliente se llega con su id, que no depende
             // de cómo esté escrito su nombre.
-            ->when($request->query('customer'), fn ($query, $id) => $query->where('user_id', $id))
+            ->when($request->query('customer'), fn ($query, $id) => $query->where('user_id', $id));
+
+        $packages = $scoped()
+            ->with(self::CUSTOMER_RELATIONS)
             // Lo anulado vive aparte, como una papelera: no aparece mezclado
             // con lo que el almacén tiene que mover, porque ya no se mueve.
             ->when(
@@ -82,10 +88,7 @@ class PackageController extends Controller
                 'total' => $packages->total(),
                 // Para que la papelera muestre cuántos hay sin tener que
                 // entrar a verla.
-                'voided_total' => Package::whereNotNull('voided_at')
-                    ->when($request->query('customer'),
-                        fn ($query, $id) => $query->where('user_id', $id))
-                    ->count(),
+                'voided_total' => $scoped()->whereNotNull('voided_at')->count(),
             ],
         ]);
     }

@@ -477,4 +477,37 @@ class FinanceTest extends TestCase
         );
         $this->assertSame(1, $papelera->json('meta.voided_total'));
     }
+
+    public function test_el_contador_de_anulados_respeta_la_busqueda(): void
+    {
+        $this->signIn('admin');
+
+        $diego = User::factory()->create(['role' => 'cliente', 'name' => 'Diego Rodríguez']);
+        $otro = User::factory()->create(['role' => 'cliente', 'name' => 'Ana Mora']);
+
+        $suyo = $this->package(['user_id' => $diego->id]);
+        $ajeno = $this->package(['user_id' => $otro->id]);
+
+        $this->postJson("/api/staff/finances/packages/{$suyo->id}/void")->assertOk();
+        $this->postJson("/api/staff/finances/packages/{$ajeno->id}/void")->assertOk();
+
+        // Sin filtro: los dos.
+        $this->assertSame(
+            2,
+            $this->getJson('/api/staff/packages')->json('meta.voided_total'),
+        );
+
+        // Buscando a Diego, el contador tiene que hablar de lo mismo que la
+        // lista: si no, el chip dice 12 mientras se ve un solo paquete.
+        $this->assertSame(
+            1,
+            $this->getJson('/api/staff/packages?search=Diego')->json('meta.voided_total'),
+        );
+
+        $this->assertSame(
+            1,
+            $this->getJson("/api/staff/packages?customer={$diego->id}")
+                ->json('meta.voided_total'),
+        );
+    }
 }
