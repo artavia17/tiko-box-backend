@@ -20,9 +20,22 @@ class PackageController extends Controller
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where('tracking_number', 'like', "%{$search}%");
             })
-            ->when($request->query('status'), function ($query, string $status) {
-                $query->where('status', $status);
-            })
+            // Lo anulado vive aparte, como una papelera: no se cobra y no se
+            // mueve, así que no tiene por qué mezclarse con lo que el cliente
+            // está esperando.
+            ->when(
+                $request->query('status') === 'anulados',
+                fn ($query) => $query->whereNotNull('voided_at'),
+                fn ($query) => $query->whereNull('voided_at'),
+            )
+            // "activos" es lo que sigue en movimiento: cuenta lo mismo que la
+            // tarjeta "En camino" del inicio.
+            ->when($request->query('status') === 'activos',
+                fn ($query) => $query->whereIn('status', PackageTracker::openStatuses()))
+            ->when(
+                in_array($request->query('status'), PackageTracker::statuses(), true),
+                fn ($query) => $query->where('status', $request->query('status')),
+            )
             // Por el punto del recorrido: primero lo que llegó a Miami y
             // último lo entregado, que ya no requiere nada del cliente.
             ->orderByRaw("CASE status
@@ -49,6 +62,10 @@ class PackageController extends Controller
                     ->where('status', '!=', 'entregado')
                     ->whereNull('voided_at')
                     ->sum('total'),
+                // Cuántos hay en la papelera, para el chip de la pantalla.
+                'voided_total' => $request->user()->packages()
+                    ->whereNotNull('voided_at')
+                    ->count(),
                 'pending_count' => $request->user()->packages()
                     ->where('status', '!=', 'entregado')
                     ->whereNull('voided_at')
