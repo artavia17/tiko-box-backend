@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PaymentReportController;
 use App\Http\Controllers\Api\PrealertController;
 use App\Http\Controllers\Api\Staff\AdminController;
 use App\Http\Controllers\Api\Staff\CatalogController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\Staff\ConsolidationController as StaffConsolidation
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\FinanceController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
+use App\Http\Controllers\Api\Staff\PaymentReportController as StaffPaymentReportController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use App\Http\Controllers\Api\Staff\StaffPrealertController;
 use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
@@ -82,6 +84,12 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::delete('/catalog/{option}', [CatalogController::class, 'destroy']);
     Route::get('/stats', [AdminController::class, 'stats']);
     Route::get('/today', [AdminController::class, 'today']);
+    // Confirmar un pago es decidir que una factura quedó saldada: lo hace
+    // un administrador, no cualquiera del almacén.
+    Route::get('/payments', [StaffPaymentReportController::class, 'index']);
+    Route::post('/packages/{package}/payments/{report}/verify', [StaffPaymentReportController::class, 'verify']);
+    Route::post('/packages/{package}/payments/{report}/reject', [StaffPaymentReportController::class, 'reject']);
+
     Route::get('/finances', [FinanceController::class, 'index']);
     Route::patch('/finances/packages/{package}', [FinanceController::class, 'update']);
     Route::post('/finances/packages/{package}/void', [FinanceController::class, 'void']);
@@ -131,6 +139,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/packages/{package}', [PackageController::class, 'show']);
     Route::get('/packages/{package}/signature', [StaffPackageController::class, 'signature']);
     Route::get('/packages/{package}/photos/{photo}', [StaffPackageController::class, 'photo']);
+
+    // Reportar el pago de una factura y volver a ver el comprobante.
+    Route::post('/packages/{package}/payments', [PaymentReportController::class, 'store']);
+    Route::get('/packages/{package}/payments/{report}/receipt', [PaymentReportController::class, 'receipt']);
 
     Route::get('/prealerts', [PrealertController::class, 'index']);
     Route::post('/prealerts', [PrealertController::class, 'store']);

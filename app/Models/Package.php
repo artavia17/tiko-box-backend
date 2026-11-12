@@ -73,6 +73,19 @@ class Package extends Model
         return $this->hasMany(PackagePhoto::class)->oldest();
     }
 
+    /**
+     * El último reporte de pago del cliente, si lo hay.
+     *
+     * Solo interesa el más reciente: un reporte rechazado se reemplaza por
+     * otro, y arrastrar el historial a la pantalla no ayuda a nadie.
+     *
+     * @return HasMany<PaymentReport, $this>
+     */
+    public function paymentReports(): HasMany
+    {
+        return $this->hasMany(PaymentReport::class)->latest('id');
+    }
+
     /** @return HasMany<PackageEvent, $this> */
     public function events(): HasMany
     {
