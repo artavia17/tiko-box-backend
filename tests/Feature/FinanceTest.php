@@ -352,15 +352,18 @@ class FinanceTest extends TestCase
         $response = $this->getJson('/api/packages');
 
         $response->assertOk();
-        // Los dos paquetes se siguen viendo...
-        $response->assertJsonCount(2, 'data');
-        // ...pero solo uno se le cobra.
+        // El anulado salió de la lista normal: ahora vive en la papelera.
+        $response->assertJsonCount(1, 'data');
+        $this->assertSame(1, $response->json('meta.voided_total'));
+
+        // Y lo que importa: no se le cobra.
         $this->assertSame(1, $response->json('meta.pending_count'));
         $this->assertEqualsWithDelta(65.00, $response->json('meta.pending_total'), 0.001);
 
-        $filas = collect($response->json('data'));
-        $this->assertTrue($filas->firstWhere('id', $anulado->id)['voided']);
-        $this->assertFalse($filas->firstWhere('id', $vigente->id)['voided']);
+        $this->assertFalse(collect($response->json('data'))->firstWhere('id', $vigente->id)['voided']);
+
+        $papelera = collect($this->getJson('/api/packages?status=anulados')->json('data'));
+        $this->assertTrue($papelera->firstWhere('id', $anulado->id)['voided']);
         $this->assertNotNull($admin);
     }
 
@@ -508,6 +511,54 @@ class FinanceTest extends TestCase
             1,
             $this->getJson("/api/staff/packages?customer={$diego->id}")
                 ->json('meta.voided_total'),
+        );
+    }
+
+    public function test_el_cliente_ve_sus_anulados_en_una_papelera_aparte(): void
+    {
+        $admin = $this->signIn('admin');
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        $vigente = $this->package(['user_id' => $customer->id]);
+        $anulado = $this->package(['user_id' => $customer->id]);
+
+        $this->postJson("/api/staff/finances/packages/{$anulado->id}/void")->assertOk();
+
+        $this->actingAs($customer);
+        $customer->withAccessToken($customer->createToken('app', ['*'])->accessToken);
+
+        // La lista normal no lo trae, pero sí dice cuántos hay guardados.
+        $normal = $this->getJson('/api/packages');
+        $this->assertSame(
+            [$vigente->id],
+            collect($normal->json('data'))->pluck('id')->all(),
+        );
+        $this->assertSame(1, $normal->json('meta.voided_total'));
+
+        // Y la papelera trae solo el anulado.
+        $this->assertSame(
+            [$anulado->id],
+            collect($this->getJson('/api/packages?status=anulados')->json('data'))
+                ->pluck('id')->all(),
+        );
+
+        $this->assertNotNull($admin);
+    }
+
+    public function test_el_cliente_filtra_lo_que_sigue_en_camino(): void
+    {
+        $customer = User::factory()->create(['role' => 'cliente']);
+
+        $enRuta = $this->package(['user_id' => $customer->id, 'status' => 'en_ruta']);
+        $this->package(['user_id' => $customer->id, 'status' => 'entregado']);
+
+        $this->actingAs($customer);
+        $customer->withAccessToken($customer->createToken('app', ['*'])->accessToken);
+
+        $this->assertSame(
+            [$enRuta->id],
+            collect($this->getJson('/api/packages?status=activos')->json('data'))
+                ->pluck('id')->all(),
         );
     }
 }
