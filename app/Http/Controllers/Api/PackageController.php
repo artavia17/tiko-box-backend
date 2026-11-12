@@ -16,7 +16,7 @@ class PackageController extends Controller
     {
         $packages = $request->user()
             ->packages()
-            ->with(['events', 'photos'])
+            ->with(['events', 'photos', 'paymentReports'])
             ->when($request->query('search'), function ($query, string $search) {
                 $query->where('tracking_number', 'like', "%{$search}%");
             })
@@ -78,7 +78,7 @@ class PackageController extends Controller
     {
         abort_unless($package->user_id === $request->user()->id, 404);
 
-        return response()->json(['data' => $this->present($package->load(['events', 'photos']))]);
+        return response()->json(['data' => $this->present($package->load(['events', 'photos', 'paymentReports']))]);
     }
 
     /**
@@ -125,6 +125,10 @@ class PackageController extends Controller
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
             'delivered_to_name' => $package->delivered_to_name,
             'has_signature' => (bool) $package->signature_path,
+            // Lo último que se sabe del pago de esta factura, si se reportó.
+            'payment' => ($report = $package->paymentReports->first())
+                ? PaymentReportController::present($report)
+                : null,
             'photos' => $package->photos->map(fn ($photo) => ['id' => $photo->id]),
             'events' => $package->events->map(fn (PackageEvent $event) => [
                 'id' => $event->id,

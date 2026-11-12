@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Staff;
 
+use App\Http\Controllers\Api\PaymentReportController;
 use App\Http\Controllers\Controller;
 use App\Models\Package;
 use App\Models\PackagePhoto;
@@ -24,6 +25,7 @@ class PackageController extends Controller
     private const CUSTOMER_RELATIONS = [
         'user',
         'photos',
+        'paymentReports',
         'events.createdBy',
         'priceAdjustedBy',
         'user.defaultShippingAddress.province',
@@ -494,6 +496,9 @@ class PackageController extends Controller
                 'at' => $event->created_at->toDateTimeString(),
                 'by' => $event->createdBy?->fullName(),
             ]),
+            'payment' => ($report = $package->paymentReports->first())
+                ? PaymentReportController::present($report)
+                : null,
             'customer' => [
                 'id' => $package->user->id,
                 'locker_code' => $package->user->locker_code,
