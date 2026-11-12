@@ -195,4 +195,52 @@ class StaffCustomerFilterTest extends TestCase
 
         $this->assertSame([$duenio->id], $ids->all());
     }
+
+    /**
+     * El número de paquetes sigue al filtro.
+     *
+     * Antes la lista decía "En tránsito" y el contador seguía mostrando
+     * todos los paquetes del cliente, así que el número parecía mal.
+     */
+    public function test_el_conteo_responde_al_filtro(): void
+    {
+        $this->actingAsAdmin();
+
+        $cliente = $this->customerWithPackage('Contable', 'en_transito');
+
+        foreach (['aduanas', 'bodega', 'entregado'] as $indice => $estado) {
+            Package::create([
+                'user_id' => $cliente->id,
+                'tracking_number' => "EXTRA{$indice}",
+                'weight_lb' => 1,
+                'price_per_pound' => 6.5,
+                'total' => 6.5,
+                'status' => $estado,
+                'received_at' => now(),
+            ]);
+        }
+
+        // Una venta anulada no se le cuenta a nadie.
+        Package::create([
+            'user_id' => $cliente->id,
+            'tracking_number' => 'ANULADO',
+            'weight_lb' => 1,
+            'price_per_pound' => 6.5,
+            'total' => 6.5,
+            'status' => 'bodega',
+            'received_at' => now(),
+            'voided_at' => now(),
+        ]);
+
+        $contar = fn (string $status) => $this
+            ->getJson('/api/staff/customers?search=Contable&status='.$status)
+            ->json('data.0.packages_count');
+
+        $this->assertSame(1, $contar('en_transito'));
+        $this->assertSame(1, $contar('aduanas'));
+        // Activos: todo lo que no se entregó ni se anuló.
+        $this->assertSame(3, $contar('activos'));
+        // Sin filtro, todo lo que se cobra: los cuatro, sin el anulado.
+        $this->assertSame(4, $contar(''));
+    }
 }

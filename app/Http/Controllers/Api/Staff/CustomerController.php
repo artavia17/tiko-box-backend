@@ -25,6 +25,22 @@ class CustomerController extends Controller
         abort_if($search === '' && ! $request->user()->isAdmin(), 403,
             'Buscá al cliente por nombre, cédula o correo.');
 
+        // Un solo criterio para filtrar y para contar: si fueran dos
+        // consultas distintas, la lista diría "En tránsito" y el número
+        // seguiría mostrando los 12 paquetes de toda la vida del cliente.
+        // Lo anulado nunca cuenta: esa venta no existe.
+        $filtra = $status === 'activos' || in_array($status, PackageTracker::openStatuses(), true);
+
+        $alcance = function ($packages) use ($status) {
+            $packages->whereNull('voided_at');
+
+            if ($status === 'activos') {
+                $packages->whereIn('status', PackageTracker::openStatuses());
+            } elseif (in_array($status, PackageTracker::openStatuses(), true)) {
+                $packages->where('status', $status);
+            }
+        };
+
         $customers = User::customers()
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
@@ -46,16 +62,8 @@ class CustomerController extends Controller
             // concreto del recorrido. 'entregado' no filtra a propósito: con
             // el tiempo todo cliente tiene entregas y la lista no separaría
             // a nadie de nadie.
-            ->when($status === 'activos', fn ($query) => $query->whereHas(
-                'packages',
-                fn ($packages) => $packages->whereIn('status', PackageTracker::openStatuses()),
-            ))
-            ->when(in_array($status, PackageTracker::openStatuses(), true),
-                fn ($query) => $query->whereHas(
-                    'packages',
-                    fn ($packages) => $packages->where('status', $status),
-                ))
-            ->withCount('packages')
+            ->when($filtra, fn ($query) => $query->whereHas('packages', $alcance))
+            ->withCount(['packages' => $alcance])
             ->orderBy('name')
             ->paginate((int) $request->query('per_page', 20));
 
