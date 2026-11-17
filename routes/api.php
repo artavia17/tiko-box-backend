@@ -21,7 +21,9 @@ use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
 use App\Http\Controllers\Api\Staff\PaymentReportController as StaffPaymentReportController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use App\Http\Controllers\Api\Staff\StaffPrealertController;
+use App\Http\Controllers\Api\Staff\SupportController as StaffSupportController;
 use App\Http\Controllers\Api\Staff\UserController as StaffUserController;
+use App\Http\Controllers\Api\SupportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json([
@@ -91,6 +93,14 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::post('/packages/{package}/payments/{report}/verify', [StaffPaymentReportController::class, 'verify']);
     Route::post('/packages/{package}/payments/{report}/reject', [StaffPaymentReportController::class, 'reject']);
 
+    // Soporte: la bandeja la atiende administración.
+    Route::get('/support', [StaffSupportController::class, 'index']);
+    Route::get('/support/{ticket}', [StaffSupportController::class, 'show']);
+    Route::post('/support/{ticket}/claim', [StaffSupportController::class, 'claim']);
+    Route::post('/support/{ticket}/messages', [StaffSupportController::class, 'reply']);
+    Route::post('/support/{ticket}/close', [StaffSupportController::class, 'close']);
+    Route::get('/support/{ticket}/attachments/{attachment}', [StaffSupportController::class, 'attachment']);
+
     Route::get('/finances', [FinanceController::class, 'index']);
     Route::patch('/finances/packages/{package}', [FinanceController::class, 'update']);
     Route::post('/finances/packages/{package}/void', [FinanceController::class, 'void']);
@@ -146,6 +156,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/packages/{package}', [PackageController::class, 'show']);
     Route::get('/packages/{package}/signature', [StaffPackageController::class, 'signature']);
     Route::get('/packages/{package}/photos/{photo}', [StaffPackageController::class, 'photo']);
+
+    // Soporte del cliente: sus tickets y el hilo de cada uno.
+    Route::get('/support', [SupportController::class, 'index']);
+    Route::get('/support/unread', [SupportController::class, 'unread']);
+    Route::post('/support', [SupportController::class, 'store']);
+    Route::get('/support/{ticket}', [SupportController::class, 'show']);
+    Route::post('/support/{ticket}/messages', [SupportController::class, 'reply']);
+    Route::post('/support/{ticket}/close', [SupportController::class, 'close']);
+    Route::get('/support/{ticket}/attachments/{attachment}', [SupportController::class, 'attachment']);
 
     // Reportar el pago de una factura y volver a ver el comprobante.
     Route::post('/packages/{package}/payments', [PaymentReportController::class, 'store']);
