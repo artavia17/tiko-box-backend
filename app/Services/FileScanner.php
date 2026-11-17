@@ -37,6 +37,11 @@ class FileScanner
         'audio/aac' => ['aac'],
         'audio/ogg' => ['ogg', 'oga'],
         'audio/webm' => ['webm'],
+        // Una nota de voz grabada en el navegador es un WebM sin pista de
+        // video, y el detector lo lee igual como video/webm. Lo mismo pasa
+        // con lo que graba Safari, que sale como MP4.
+        'video/webm' => ['webm'],
+        'video/ogg' => ['ogg', 'oga'],
         'audio/wav' => ['wav'],
         'audio/x-wav' => ['wav'],
         'video/mp4' => ['mp4'],
