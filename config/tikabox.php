@@ -63,4 +63,12 @@ return [
         'max_attempts' => (int) env('VERIFICATION_MAX_ATTEMPTS', 5),
     ],
 
+    /**
+     * Ruta al binario de ClamAV, si el servidor lo tiene.
+     *
+     * Vacío significa sin antivirus: los adjuntos pasan igual, validados
+     * solo por tipo real de archivo.
+     */
+    'clamav' => env('CLAMAV_BINARY', ''),
+
 ];
