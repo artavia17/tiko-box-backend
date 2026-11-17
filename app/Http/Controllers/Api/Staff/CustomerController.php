@@ -127,6 +127,8 @@ class CustomerController extends Controller
         return [
             'id' => $customer->id,
             'locker_code' => $customer->locker_code,
+            // Para reconocer a quien llega a retirar un paquete.
+            'has_avatar' => (bool) $customer->avatar_path,
             'full_name' => $customer->fullName(),
             'identification' => $customer->identification,
             'email' => $customer->email,

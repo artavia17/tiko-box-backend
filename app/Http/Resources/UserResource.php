@@ -27,6 +27,8 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'locker_code' => $this->locker_code,
+            // Solo si tiene: la foto se baja aparte, con el token.
+            'has_avatar' => (bool) $this->avatar_path,
             'role' => $this->role,
             'email_verified' => $this->hasVerifiedEmail(),
             'authorized_persons' => $this->whenLoaded(

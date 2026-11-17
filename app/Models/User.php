@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
     'locker_code',
     'name',
     'email',
+    'avatar_path',
     'password',
     'role',
     'collects_payments',

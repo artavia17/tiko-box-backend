@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AvailabilityController;
+use App\Http\Controllers\Api\AvatarController;
 use App\Http\Controllers\Api\ConsolidationController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\LockerController;
@@ -125,6 +126,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ajustes de la cuenta
     Route::patch('/me', [AccountController::class, 'update']);
+
+    // Foto de perfil. Subir va por POST con multipart; PHP no arma $_FILES
+    // en un PUT de verdad.
+    Route::post('/me/avatar', [AvatarController::class, 'store']);
+    Route::delete('/me/avatar', [AvatarController::class, 'destroy']);
+    Route::get('/users/{user}/avatar', [AvatarController::class, 'show']);
     Route::put('/me/password', [AccountController::class, 'updatePassword']);
 
     // Direcciones de entrega
