@@ -25,6 +25,8 @@ class FinanceController extends Controller
         $data = $request->validate([
             'year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
             'month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
         $year = (int) ($data['year'] ?? now()->year);
@@ -44,10 +46,21 @@ class FinanceController extends Controller
         // ganancia inflada: ninguna de las dos entra en los totales.
         $costed = $rows->where('voided', false)->where('cost', '!==', null);
 
+        // Los totales salen de todo el periodo y no de la página que se está
+        // viendo: un resumen que cambiara al pasar de página no sería un
+        // resumen de nada.
+        $perPage = (int) ($data['per_page'] ?? 25);
+        $page = (int) ($data['page'] ?? 1);
+
         return response()->json([
             'data' => [
                 'period' => ['year' => $year, 'month' => $month],
-                'rows' => $rows,
+                'rows' => $rows->forPage($page, $perPage)->values(),
+                'pagination' => [
+                    'current_page' => $page,
+                    'last_page' => max(1, (int) ceil($rows->count() / $perPage)),
+                    'total' => $rows->count(),
+                ],
                 'totals' => [
                     'packages' => $costed->count(),
                     'weight_lb' => round((float) $costed->sum('weight_lb'), 2),
