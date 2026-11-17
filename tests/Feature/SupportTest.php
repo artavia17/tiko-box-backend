@@ -193,6 +193,21 @@ class SupportTest extends TestCase
         ]))->assertJsonValidationErrors('files.0');
     }
 
+    /**
+     * Una nota de voz del navegador.
+     *
+     * Un WebM de solo audio se detecta como video/webm, no como audio/webm:
+     * dejarlo fuera de la lista rechazaba toda nota de voz.
+     */
+    public function test_se_adjunta_una_nota_de_voz(): void
+    {
+        $this->signIn();
+
+        $this->post('/api/support', $this->payload([
+            'files' => [UploadedFile::fake()->create('nota-de-voz.webm', 40, 'video/webm')],
+        ]))->assertCreated();
+    }
+
     public function test_lo_no_leido_se_limpia_al_abrir_el_ticket(): void
     {
         $customer = $this->signIn();
