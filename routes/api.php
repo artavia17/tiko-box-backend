@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\FinanceController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
 use App\Http\Controllers\Api\Staff\PaymentReportController as StaffPaymentReportController;
+use App\Http\Controllers\Api\Staff\SettingController;
 use App\Http\Controllers\Api\Staff\StaffAuthController;
 use App\Http\Controllers\Api\Staff\StaffPrealertController;
 use App\Http\Controllers\Api\Staff\SupportController as StaffSupportController;
@@ -63,6 +64,9 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     Route::get('/customers', [CustomerController::class, 'index']);
     Route::get('/customers/{customer}', [CustomerController::class, 'show']);
 
+    // Los ajustes los lee todo el almacén; cambiarlos es de administración.
+    Route::get('/settings', [SettingController::class, 'index']);
+
     // Paquetes
     Route::get('/summary', [StaffPackageController::class, 'summary']);
     Route::get('/prealerts', [StaffPrealertController::class, 'index']);
@@ -100,6 +104,8 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::post('/support/{ticket}/messages', [StaffSupportController::class, 'reply']);
     Route::post('/support/{ticket}/close', [StaffSupportController::class, 'close']);
     Route::get('/support/{ticket}/attachments/{attachment}', [StaffSupportController::class, 'attachment']);
+
+    Route::put('/settings', [SettingController::class, 'update']);
 
     Route::get('/finances', [FinanceController::class, 'index']);
     Route::patch('/finances/packages/{package}', [FinanceController::class, 'update']);
