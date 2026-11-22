@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\AuthorizedPerson;
 use App\Models\User;
+use App\Rules\SingleName;
 use App\Services\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,9 +31,9 @@ class AccountController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'second_last_name' => ['nullable', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100', new SingleName('tu nombre')],
+            'last_name' => ['required', 'string', 'max:100', new SingleName('tu primer apellido')],
+            'second_last_name' => ['nullable', 'string', 'max:100', new SingleName('tu segundo apellido')],
             'phone' => [
                 'required',
                 'string',

@@ -89,10 +89,16 @@ class FinanceTest extends TestCase
         $this->assertNull($sinCosto['profit'], 'Sin costo no hay ganancia que mostrar.');
         $this->assertSame(1, $report['pending']);
 
-        // Los totales solo cuentan lo que sí tiene costo: sumar una venta sin
-        // su costo daría una ganancia inflada.
-        $this->assertSame(1, $report['totals']['packages']);
-        $this->assertEqualsWithDelta(65.00, $report['totals']['revenue'], 0.001);
+        // Lo vendido se sabe siempre, así que los dos paquetes cuentan: antes
+        // el total se quedaba en cero mientras nadie hubiera costeado nada, y
+        // eso se leía como que no se había vendido.
+        $this->assertSame(2, $report['totals']['packages']);
+        $this->assertEqualsWithDelta(130.00, $report['totals']['revenue'], 0.001);
+
+        // El costo y la ganancia solo cuentan lo costeado: sumar una venta
+        // sin su costo daría una ganancia inflada.
+        $this->assertSame(1, $report['totals']['uncosted']);
+        $this->assertEqualsWithDelta(34.90, $report['totals']['cost'], 0.001);
         $this->assertEqualsWithDelta(30.10, $report['totals']['profit'], 0.001);
     }
 

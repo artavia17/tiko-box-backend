@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\SingleName;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -59,8 +60,8 @@ class StaffAuthController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100', new SingleName('tu nombre')],
+            'last_name' => ['required', 'string', 'max:100', new SingleName('tu primer apellido')],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['empleado', 'admin'])],

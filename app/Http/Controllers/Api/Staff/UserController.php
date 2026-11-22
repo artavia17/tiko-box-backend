@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\SingleName;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -49,9 +50,9 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'second_last_name' => ['nullable', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100', new SingleName('tu nombre')],
+            'last_name' => ['required', 'string', 'max:100', new SingleName('tu primer apellido')],
+            'second_last_name' => ['nullable', 'string', 'max:100', new SingleName('tu segundo apellido')],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'phone' => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone')],
             'identification' => ['nullable', 'string', 'max:30', Rule::unique('users', 'identification')],
@@ -86,9 +87,9 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'second_last_name' => ['nullable', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100', new SingleName('tu nombre')],
+            'last_name' => ['required', 'string', 'max:100', new SingleName('tu primer apellido')],
+            'second_last_name' => ['nullable', 'string', 'max:100', new SingleName('tu segundo apellido')],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id)],
             'identification' => ['nullable', 'string', 'max:30', Rule::unique('users', 'identification')->ignore($user->id)],
