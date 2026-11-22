@@ -42,9 +42,12 @@ class FinanceController extends Controller
             ->get();
 
         $rows = $packages->map($this->present(...));
-        // Una venta anulada no es plata, y una sin costo conocido daría una
-        // ganancia inflada: ninguna de las dos entra en los totales.
-        $costed = $rows->where('voided', false)->where('cost', '!==', null);
+
+        // Una venta anulada no es plata y nunca entra en los totales.
+        $vendidos = $rows->where('voided', false);
+        // El costo solo se sabe de los paquetes ya costeados; sumar los
+        // demás como cero daría una ganancia inflada.
+        $costed = $vendidos->where('cost', '!==', null);
 
         // Los totales salen de todo el periodo y no de la página que se está
         // viendo: un resumen que cambiara al pasar de página no sería un
@@ -62,13 +65,19 @@ class FinanceController extends Controller
                     'total' => $rows->count(),
                 ],
                 'totals' => [
-                    'packages' => $costed->count(),
-                    'weight_lb' => round((float) $costed->sum('weight_lb'), 2),
+                    // Lo vendido y lo pesado se sabe siempre; antes se
+                    // contaban solo los costeados y el total aparecía en
+                    // cero mientras nadie hubiera costeado nada.
+                    'packages' => $vendidos->count(),
+                    'weight_lb' => round((float) $vendidos->sum('weight_lb'), 2),
+                    'revenue' => round((float) $vendidos->sum('revenue'), 2),
+                    // Cuántos esperan que alguien les ponga el costo: sin
+                    // esto, la ganancia parece menor de lo que será.
+                    'uncosted' => $vendidos->count() - $costed->count(),
                     'cost' => round((float) $costed->sum('cost'), 2),
-                    'revenue' => round((float) $costed->sum('revenue'), 2),
                     'profit' => round((float) $costed->sum('profit'), 2),
                     'cost_crc' => round((float) $costed->sum('cost_crc'), 2),
-                    'revenue_crc' => round((float) $costed->sum('revenue_crc'), 2),
+                    'revenue_crc' => round((float) $vendidos->sum('revenue_crc'), 2),
                     'profit_crc' => round((float) $costed->sum('profit_crc'), 2),
                 ],
                 // El resumen del año, mes por mes: es lo que deja ver si el

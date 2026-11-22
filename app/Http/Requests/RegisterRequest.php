@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Canton;
 use App\Models\District;
+use App\Rules\SingleName;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -22,9 +23,9 @@ class RegisterRequest extends FormRequest
     {
         return [
             // Paso 1: información personal
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'],
-            'second_last_name' => ['nullable', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100', new SingleName('tu nombre')],
+            'last_name' => ['required', 'string', 'max:100', new SingleName('tu primer apellido')],
+            'second_last_name' => ['nullable', 'string', 'max:100', new SingleName('tu segundo apellido')],
             'identification_type' => ['required', Rule::in(['nacional', 'extranjero'])],
             'identification' => [
                 'required',
