@@ -105,7 +105,8 @@ class StaffUserManagementTest extends TestCase
         ]);
 
         $this->putJson("/api/staff/users/{$verified->id}", [
-            'first_name' => 'Ana María',
+            // Un nombre, no dos: una casilla por nombre es la regla.
+            'first_name' => 'Anamaría',
             'last_name' => 'Mora',
             'email' => $verified->email,
             'role' => 'cliente',
