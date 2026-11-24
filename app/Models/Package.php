@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'voided_by',
     'void_reason',
     'collected_by',
+    'payment_method',
+    'payment_reference',
     'original_total',
     'price_note',
     'price_adjusted_by',

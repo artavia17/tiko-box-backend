@@ -81,6 +81,8 @@ Route::middleware(['auth:sanctum', 'staff'])->prefix('staff')->group(function ()
     Route::post('/consolidations/{consolidation}/process', [StaffConsolidationController::class, 'process']);
     Route::patch('/packages/{package}/status', [StaffPackageController::class, 'updateStatus']);
     Route::post('/packages/{package}/deliver', [StaffPackageController::class, 'deliver']);
+    // Varios paquetes del mismo cliente, con una firma y un solo cobro.
+    Route::post('/packages/deliver-batch', [StaffPackageController::class, 'deliverBatch']);
     Route::patch('/packages/{package}/price', [StaffPackageController::class, 'adjustPrice']);
     Route::delete('/packages/{package}', [StaffPackageController::class, 'destroy']);
 });
