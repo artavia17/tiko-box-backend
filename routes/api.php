@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Staff\CatalogController;
 use App\Http\Controllers\Api\Staff\ConsolidationController as StaffConsolidationController;
 use App\Http\Controllers\Api\Staff\CustomerController;
 use App\Http\Controllers\Api\Staff\FinanceController;
+use App\Http\Controllers\Api\Staff\ManualInvoiceController;
 use App\Http\Controllers\Api\Staff\PackageController as StaffPackageController;
 use App\Http\Controllers\Api\Staff\PaymentReportController as StaffPaymentReportController;
 use App\Http\Controllers\Api\Staff\SettingController;
@@ -106,6 +107,12 @@ Route::middleware(['auth:sanctum', 'staff:admin'])->prefix('staff')->group(funct
     Route::get('/support/{ticket}/attachments/{attachment}', [StaffSupportController::class, 'attachment']);
 
     Route::put('/settings', [SettingController::class, 'update']);
+
+    // Facturas emitidas a mano, para paquetes que nunca se registraron.
+    Route::get('/manual-invoices', [ManualInvoiceController::class, 'index']);
+    Route::post('/manual-invoices', [ManualInvoiceController::class, 'store']);
+    Route::put('/manual-invoices/{invoice}', [ManualInvoiceController::class, 'update']);
+    Route::delete('/manual-invoices/{invoice}', [ManualInvoiceController::class, 'destroy']);
 
     Route::get('/finances', [FinanceController::class, 'index']);
     Route::patch('/finances/packages/{package}', [FinanceController::class, 'update']);
