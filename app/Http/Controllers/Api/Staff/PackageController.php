@@ -129,6 +129,17 @@ class PackageController extends Controller
             'photos.*.mimes' => 'Las fotos deben ser PNG, JPG o WEBP.',
             'photos.*.max' => 'Cada foto puede pesar hasta 8 MB.',
             'photos.max' => 'Hasta 8 fotos por paquete.',
+            // Escritos a mano, como el resto: sin ellos sale el texto que
+            // traiga el framework, y si las traducciones no resuelven en el
+            // servidor el cliente termina leyendo "validation.min.numeric".
+            'price_per_pound.numeric' => 'La tarifa tiene que ser un número.',
+            'price_per_pound.min' => 'La tarifa no puede ser cero.',
+            'cost.numeric' => 'El costo tiene que ser un número.',
+            'cost.min' => 'El costo no puede ser negativo.',
+            'cost.max' => 'Ese costo es demasiado alto; revisalo.',
+            'exchange_rate.numeric' => 'El tipo de cambio tiene que ser un número.',
+            'exchange_rate.min' => 'El tipo de cambio son colones por dólar, así que no puede ser menor que 1.',
+            'exchange_rate.max' => 'Ese tipo de cambio es demasiado alto; revisalo.',
         ]);
 
         $customer = User::customers()->find($data['customer_id']);
@@ -282,6 +293,105 @@ class PackageController extends Controller
         $tracker->record($fresh, $request->user(), 'Recibido por '.$data['delivered_to_name']);
 
         return response()->json(['data' => $this->present($fresh)]);
+    }
+
+    /**
+     * Entrega varios paquetes de una sola vez.
+     *
+     * En el mostrador la gente retira todo junto, firma una vez y paga una
+     * vez. Entregarlos de a uno obligaba a repetir la firma y a cobrar por
+     * separado algo que se cobró junto.
+     *
+     * Todos tienen que ser del mismo cliente: una firma vale por lo que esa
+     * persona recibió, no por los paquetes de otro que iban en la misma
+     * tanda.
+     */
+    public function deliverBatch(Request $request, PackageTracker $tracker): JsonResponse
+    {
+        $data = $request->validate([
+            'package_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'package_ids.*' => ['integer'],
+            'delivered_to_name' => ['required', 'string', 'max:120'],
+            'delivered_to_identification' => ['nullable', 'string', 'max:30'],
+            'signature' => ['required', File::types(['png', 'jpg', 'jpeg'])->max(2048)],
+            'collected_by' => ['required', 'string', 'max:80'],
+            'payment_method' => ['required', 'string', 'in:efectivo,sinpe,transferencia,tarjeta'],
+            'payment_reference' => ['nullable', 'string', 'max:60'],
+        ], [
+            'package_ids.required' => 'Elegí al menos un paquete.',
+            'delivered_to_name.required' => 'Escribí el nombre de quien recibe.',
+            'signature.required' => 'Falta la firma de quien recibe.',
+            'collected_by.required' => 'Indicá quién cobró.',
+            'payment_method.required' => 'Indicá cómo se pagó.',
+        ]);
+
+        $packages = Package::whereIn('id', array_unique($data['package_ids']))->get();
+
+        if ($packages->count() !== count(array_unique($data['package_ids']))) {
+            throw ValidationException::withMessages([
+                'package_ids' => 'Alguno de esos paquetes ya no existe.',
+            ]);
+        }
+
+        if ($packages->pluck('user_id')->unique()->count() > 1) {
+            throw ValidationException::withMessages([
+                'package_ids' => 'Los paquetes son de clientes distintos. Entregá los de cada uno por separado.',
+            ]);
+        }
+
+        $entregado = $packages->firstWhere('status', 'entregado');
+
+        if ($entregado) {
+            throw ValidationException::withMessages([
+                'package_ids' => "El paquete {$entregado->tracking_number} ya figura como entregado.",
+            ]);
+        }
+
+        $anulado = $packages->first(fn (Package $package) => $package->voided_at !== null);
+
+        if ($anulado) {
+            throw ValidationException::withMessages([
+                'package_ids' => "El paquete {$anulado->tracking_number} está anulado y no se entrega.",
+            ]);
+        }
+
+        // Una sola firma para todos: es la que esa persona dio al retirar.
+        $signature = $request->file('signature')->store(
+            "signatures/{$packages->first()->user_id}",
+            'local',
+        );
+
+        DB::transaction(function () use ($packages, $data, $signature) {
+            foreach ($packages as $package) {
+                $package->update([
+                    'status' => 'entregado',
+                    'delivered_at' => now(),
+                    'delivered_to_name' => $data['delivered_to_name'],
+                    'delivered_to_identification' => $data['delivered_to_identification'] ?? null,
+                    'signature_path' => $signature,
+                    'collected_by' => trim($data['collected_by']),
+                    'payment_method' => $data['payment_method'],
+                    'payment_reference' => $data['payment_reference'] ?? null,
+                ]);
+            }
+        });
+
+        foreach ($packages as $package) {
+            $tracker->record(
+                $package->fresh(),
+                $request->user(),
+                'Recibido por '.$data['delivered_to_name'],
+            );
+        }
+
+        $fresh = Package::whereIn('id', $packages->pluck('id'))
+            ->with(self::CUSTOMER_RELATIONS)
+            ->get();
+
+        return response()->json([
+            'data' => $fresh->map($this->present(...)),
+            'meta' => ['collected' => round((float) $fresh->sum('total'), 2)],
+        ]);
     }
 
     /**
@@ -486,6 +596,9 @@ class PackageController extends Controller
             'delivered_at' => $package->delivered_at?->toDateTimeString(),
             'delivered_to_name' => $package->delivered_to_name,
             'delivered_to_identification' => $package->delivered_to_identification,
+            'collected_by' => $package->collected_by,
+            'payment_method' => $package->payment_method,
+            'payment_reference' => $package->payment_reference,
             'has_signature' => (bool) $package->signature_path,
             'photos' => $package->photos->map(fn (PackagePhoto $photo) => ['id' => $photo->id]),
             // Cada paso, con quién lo hizo: es el historial del paquete.
