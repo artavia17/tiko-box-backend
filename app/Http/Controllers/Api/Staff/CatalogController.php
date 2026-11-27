@@ -9,6 +9,7 @@ use App\Models\PaymentReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /** Las listas de transportistas, tiendas y formas de pago del almacén. */
@@ -99,17 +100,65 @@ class CatalogController extends Controller
     }
 
     /** Baja: solo administración. */
+    /**
+     * Corrige el nombre de una opción.
+     *
+     * Los registros guardan el nombre y no el id, así que el cambio se
+     * arrastra a lo ya guardado: si no, corregir "Amazonn" dejaría la lista
+     * bien y el historial con la falta de ortografía para siempre.
+     */
+    public function update(Request $request, CatalogOption $option): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:80',
+                Rule::unique('catalog_options', 'name')
+                    ->where('type', $option->type)
+                    ->ignore($option->id),
+            ],
+        ], [
+            'name.unique' => 'Ya hay otra con ese nombre.',
+        ]);
+
+        $before = $option->name;
+        $after = trim($data['name']);
+
+        if ($before === $after) {
+            return response()->json([
+                'data' => ['id' => $option->id, 'name' => $option->name],
+                'message' => 'No cambió nada.',
+            ]);
+        }
+
+        $updated = DB::transaction(function () use ($option, $before, $after) {
+            $option->update(['name' => $after]);
+
+            $column = $this->columnFor($option->type);
+            $count = Package::where($column, $before)->update([$column => $after]);
+
+            if ($option->type === 'payment_method') {
+                $count += PaymentReport::where('method', $before)
+                    ->update(['method' => $after]);
+            }
+
+            return $count;
+        });
+
+        return response()->json([
+            'data' => ['id' => $option->id, 'name' => $option->name],
+            'message' => $updated > 0
+                ? "Se renombró. Los {$updated} registros que la usaban quedaron al día."
+                : 'Se renombró.',
+        ]);
+    }
+
     public function destroy(CatalogOption $option): JsonResponse
     {
         // Los paquetes guardan el nombre, no el id, así que borrar una opción
         // no rompe el historial; solo deja de ofrecerse de aquí en adelante.
-        $column = match ($option->type) {
-            'carrier' => 'courier',
-            'payment_method' => 'payment_method',
-            default => 'store',
-        };
-
-        $used = Package::where($column, $option->name)->count();
+        $used = Package::where($this->columnFor($option->type), $option->name)->count();
 
         // Una forma de pago se usa además en lo que reportan los clientes.
         if ($option->type === 'payment_method') {
@@ -123,6 +172,16 @@ class CatalogController extends Controller
                 ? "Se quitó de la lista. Los {$used} paquetes que ya la usaban la conservan."
                 : 'Se quitó de la lista.',
         ]);
+    }
+
+    /** En qué columna del paquete vive cada tipo de lista. */
+    private function columnFor(string $type): string
+    {
+        return match ($type) {
+            'carrier' => 'courier',
+            'payment_method' => 'payment_method',
+            default => 'store',
+        };
     }
 
     /**
