@@ -567,4 +567,48 @@ class FinanceTest extends TestCase
                 ->pluck('id')->all(),
         );
     }
+
+    /**
+     * Un solo buscador para todo.
+     *
+     * Quien busca tiene un dato en la mano —un rastreo, un correo, un
+     * nombre— y no sabe en qué columna vive.
+     */
+    public function test_el_buscador_encuentra_por_rastreo_y_por_cliente(): void
+    {
+        $this->signIn('admin');
+
+        $cliente = User::factory()->create([
+            'role' => 'cliente',
+            'name' => 'Vivian Rodríguez',
+            'email' => 'vivian@ejemplo.test',
+        ]);
+
+        $this->package(['tracking_number' => 'TBA111', 'user_id' => $cliente->id]);
+        $this->package(['tracking_number' => 'TBA999']);
+
+        $porRastreo = $this->getJson('/api/staff/finances?search=TBA111')->json('data.rows');
+        $this->assertCount(1, $porRastreo);
+        $this->assertSame('TBA111', $porRastreo[0]['tracking_number']);
+
+        $porCorreo = $this->getJson('/api/staff/finances?search=vivian@')->json('data.rows');
+        $this->assertCount(1, $porCorreo);
+
+        $porNombre = $this->getJson('/api/staff/finances?search=Vivian')->json('data.rows');
+        $this->assertCount(1, $porNombre);
+    }
+
+    /** Lo que se suma es lo que se está viendo, no todo el periodo. */
+    public function test_los_totales_siguen_al_buscador(): void
+    {
+        $this->signIn('admin');
+
+        $this->package(['tracking_number' => 'TBA111', 'total' => 65, 'cost' => 34.90]);
+        $this->package(['tracking_number' => 'TBA999', 'total' => 13, 'cost' => 6.98]);
+
+        $totals = $this->getJson('/api/staff/finances?search=TBA111')->json('data.totals');
+
+        $this->assertSame(1, $totals['packages']);
+        $this->assertEqualsWithDelta(65.0, $totals['revenue'], 0.001);
+    }
 }
