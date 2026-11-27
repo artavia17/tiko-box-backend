@@ -25,6 +25,7 @@ class FinanceController extends Controller
         $data = $request->validate([
             'year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
             'month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'search' => ['nullable', 'string', 'max:120'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
@@ -36,8 +37,29 @@ class FinanceController extends Controller
             ? [Carbon::create($year, $month, 1)->startOfMonth(), Carbon::create($year, $month, 1)->endOfMonth()]
             : [Carbon::create($year, 1, 1)->startOfYear(), Carbon::create($year, 1, 1)->endOfYear()];
 
-        $packages = Package::with('user:id,first_name,last_name,second_last_name,locker_code')
+        $search = trim((string) ($data['search'] ?? ''));
+
+        $packages = Package::with('user:id,first_name,last_name,second_last_name,locker_code,email')
             ->whereBetween('received_at', [$from, $to])
+            // Un solo campo para todo: quien busca tiene un dato en la mano
+            // —un rastreo, un correo, un nombre— y no sabe en qué columna
+            // vive. Preguntar por cuál es antes de dejarlo buscar es tiempo
+            // perdido de quien atiende.
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('tracking_number', 'like', "%{$search}%")
+                        ->orWhere('request_number', 'like', "%{$search}%")
+                        ->orWhere('store', 'like', "%{$search}%")
+                        ->orWhere('collected_by', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($user) use ($search) {
+                            $user->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('locker_code', 'like', "%{$search}%")
+                                ->orWhere('identification', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->orderByDesc('received_at')
             ->get();
 
