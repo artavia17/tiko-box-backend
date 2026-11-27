@@ -181,6 +181,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/support/{ticket}/close', [SupportController::class, 'close']);
     Route::get('/support/{ticket}/attachments/{attachment}', [SupportController::class, 'attachment']);
 
+    // Con qué puede decir el cliente que pagó.
+    Route::get('/payment-methods', [PaymentReportController::class, 'methods']);
+
     // Reportar el pago de una factura y volver a ver el comprobante.
     Route::post('/packages/{package}/payments', [PaymentReportController::class, 'store']);
     Route::get('/packages/{package}/payments/{report}/receipt', [PaymentReportController::class, 'receipt']);

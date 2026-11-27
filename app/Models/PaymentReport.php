@@ -34,18 +34,6 @@ class PaymentReport extends Model
 
     public const RECHAZADO = 'rechazado';
 
-    /**
-     * Formas de pago que el cliente puede reportar.
-     *
-     * No hay tarjeta: acá no se cobra nada en línea, el cliente avisa de un
-     * pago que ya hizo por fuera y el almacén lo confirma.
-     */
-    public const METHODS = [
-        'efectivo' => 'Efectivo',
-        'sinpe' => 'SINPE Móvil',
-        'transferencia' => 'Transferencia bancaria',
-    ];
-
     protected function casts(): array
     {
         return [

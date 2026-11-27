@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CatalogOption;
 use App\Models\Package;
 use App\Models\PaymentReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +22,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class PaymentReportController extends Controller
 {
+    /**
+     * Las formas de pago que el cliente puede elegir.
+     *
+     * Las administra el negocio desde Listas del almacén, pero el cliente no
+     * tiene acceso a esa pantalla: por eso se le sirven aparte.
+     */
+    public function methods(): JsonResponse
+    {
+        return response()->json(['data' => CatalogOption::paymentMethods()]);
+    }
+
     public function store(Request $request, Package $package): JsonResponse
     {
         abort_unless($package->user_id === $request->user()->id, 404);
@@ -27,13 +40,17 @@ class PaymentReportController extends Controller
         $this->assertPayable($package);
 
         $data = $request->validate([
-            'method' => ['required', 'string', 'in:'.implode(',', array_keys(PaymentReport::METHODS))],
+            // La lista la administra el negocio desde Listas del almacén, no
+            // el código: una forma de pago nueva no debería necesitar un
+            // despliegue.
+            'method' => ['required', 'string', Rule::in(CatalogOption::paymentMethods())],
             'reference' => ['required', 'string', 'max:60'],
             'paid_on' => ['required', 'date', 'before_or_equal:today'],
             'receipt' => ['nullable', 'file', 'mimes:pdf,png,jpg,jpeg,webp', 'max:8192'],
             'comment' => ['nullable', 'string', 'max:500'],
         ], [
             'method.required' => 'Elegí con qué pagaste.',
+            'method.in' => 'Esa forma de pago ya no está disponible.',
             'reference.required' => 'Anotá el número del pago o del comprobante.',
             'paid_on.required' => 'Indicá la fecha del pago.',
             'paid_on.before_or_equal' => 'La fecha del pago no puede ser futura.',
@@ -118,7 +135,8 @@ class PaymentReportController extends Controller
             'id' => $report->id,
             'status' => $report->status,
             'method' => $report->method,
-            'method_label' => PaymentReport::METHODS[$report->method] ?? $report->method,
+            // Se guarda el nombre tal cual, así que el rótulo es el mismo.
+            'method_label' => $report->method,
             'reference' => $report->reference,
             'paid_on' => $report->paid_on->toDateString(),
             'amount' => $report->amount,

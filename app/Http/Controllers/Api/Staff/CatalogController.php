@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\CatalogOption;
 use App\Models\Package;
+use App\Models\PaymentReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
-/** Las listas de transportistas y tiendas que usa el almacén. */
+/** Las listas de transportistas, tiendas y formas de pago del almacén. */
 class CatalogController extends Controller
 {
     /** Lo lee cualquiera del personal: es lo que llena los selects. */
@@ -22,6 +23,7 @@ class CatalogController extends Controller
             'data' => [
                 'carriers' => $this->present($options, 'carrier'),
                 'stores' => $this->present($options, 'store'),
+                'payment_methods' => $this->present($options, 'payment_method'),
             ],
         ]);
     }
@@ -101,8 +103,18 @@ class CatalogController extends Controller
     {
         // Los paquetes guardan el nombre, no el id, así que borrar una opción
         // no rompe el historial; solo deja de ofrecerse de aquí en adelante.
-        $used = Package::where($option->type === 'carrier' ? 'courier' : 'store', $option->name)
-            ->count();
+        $column = match ($option->type) {
+            'carrier' => 'courier',
+            'payment_method' => 'payment_method',
+            default => 'store',
+        };
+
+        $used = Package::where($column, $option->name)->count();
+
+        // Una forma de pago se usa además en lo que reportan los clientes.
+        if ($option->type === 'payment_method') {
+            $used += PaymentReport::where('method', $option->name)->count();
+        }
 
         $option->delete();
 

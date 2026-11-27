@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Api\PaymentReportController;
 use App\Http\Controllers\Controller;
+use App\Models\CatalogOption;
 use App\Models\Package;
 use App\Models\PackagePhoto;
 use App\Models\Prealert;
@@ -315,7 +316,7 @@ class PackageController extends Controller
             'delivered_to_identification' => ['nullable', 'string', 'max:30'],
             'signature' => ['required', File::types(['png', 'jpg', 'jpeg'])->max(2048)],
             'collected_by' => ['required', 'string', 'max:80'],
-            'payment_method' => ['required', 'string', 'in:efectivo,sinpe,transferencia,tarjeta'],
+            'payment_method' => ['required', 'string', Rule::in(CatalogOption::paymentMethods())],
             'payment_reference' => ['nullable', 'string', 'max:60'],
         ], [
             'package_ids.required' => 'Elegí al menos un paquete.',
@@ -323,6 +324,7 @@ class PackageController extends Controller
             'signature.required' => 'Falta la firma de quien recibe.',
             'collected_by.required' => 'Indicá quién cobró.',
             'payment_method.required' => 'Indicá cómo se pagó.',
+            'payment_method.in' => 'Esa forma de pago ya no está disponible.',
         ]);
 
         $packages = Package::whereIn('id', array_unique($data['package_ids']))->get();

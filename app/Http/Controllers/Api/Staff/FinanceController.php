@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\CatalogOption;
 use App\Models\Package;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 /**
  * Lo que deja cada paquete: cuánto costó, cuánto se cobró y la diferencia.
@@ -126,7 +128,18 @@ class FinanceController extends Controller
             'exchange_rate' => ['nullable', 'numeric', 'min:1', 'max:5000'],
             'total' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'collected_by' => ['nullable', 'string', 'max:80'],
+            // Obligatoria en cuanto alguien cobró: una venta cobrada sin
+            // saber cómo entró la plata no se puede cuadrar después.
+            'payment_method' => [
+                'nullable',
+                'required_with:collected_by',
+                'string',
+                Rule::in(CatalogOption::paymentMethods()),
+            ],
             'request_number' => ['nullable', 'string', 'max:60'],
+        ], [
+            'payment_method.required_with' => 'Si alguien cobró, indicá cómo se pagó.',
+            'payment_method.in' => 'Esa forma de pago ya no está disponible.',
         ]);
 
         $changes = [];
@@ -141,6 +154,10 @@ class FinanceController extends Controller
 
         if ($request->has('collected_by')) {
             $changes['collected_by'] = trim((string) $data['collected_by']) ?: null;
+        }
+
+        if ($request->has('payment_method')) {
+            $changes['payment_method'] = trim((string) $data['payment_method']) ?: null;
         }
 
         if ($request->has('exchange_rate')) {
@@ -271,6 +288,7 @@ class FinanceController extends Controller
             'received_at' => $package->received_at?->toDateString(),
             'status' => $package->status,
             'collected_by' => $package->collected_by,
+            'payment_method' => $package->payment_method,
             'voided' => $package->voided_at !== null,
             'void_reason' => $package->void_reason,
         ];

@@ -57,7 +57,7 @@ class BatchDeliveryTest extends TestCase
             'delivered_to_identification' => '1-2345-6789',
             'signature' => UploadedFile::fake()->image('firma.png'),
             'collected_by' => 'Henry',
-            'payment_method' => 'sinpe',
+            'payment_method' => 'SINPE Móvil',
         ], $overrides);
     }
 
@@ -78,7 +78,7 @@ class BatchDeliveryTest extends TestCase
         $this->assertEqualsWithDelta(33.0, $response->json('meta.collected'), 0.001);
 
         $this->assertSame('entregado', $uno->fresh()->status);
-        $this->assertSame('sinpe', $dos->fresh()->payment_method);
+        $this->assertSame('SINPE Móvil', $dos->fresh()->payment_method);
         $this->assertSame('Henry', $dos->fresh()->collected_by);
     }
 
