@@ -323,22 +323,49 @@ class FinanceTest extends TestCase
         $this->assertNotNull($admin);
     }
 
-    public function test_se_anota_a_mano_quien_cobro_el_paquete(): void
+    public function test_se_anota_quien_cobro_y_como_se_pago(): void
     {
         $this->signIn('admin');
         $package = $this->package();
 
         $response = $this->patchJson("/api/staff/finances/packages/{$package->id}", [
             'collected_by' => 'Henry',
+            'payment_method' => 'Efectivo',
         ]);
 
         $response->assertOk();
         $response->assertJsonPath('data.collected_by', 'Henry');
+        $response->assertJsonPath('data.payment_method', 'Efectivo');
 
         // Dejarlo en blanco lo borra, en vez de guardar una cadena vacía.
         $this->patchJson("/api/staff/finances/packages/{$package->id}", [
             'collected_by' => '  ',
         ])->assertJsonPath('data.collected_by', null);
+    }
+
+    /**
+     * Cobrado sin saber cómo entró la plata no se puede cuadrar después.
+     */
+    public function test_decir_quien_cobro_obliga_a_decir_como_se_pago(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'collected_by' => 'Henry',
+        ])->assertJsonValidationErrors('payment_method');
+    }
+
+    /** Lo que no está en la lista del almacén no se acepta. */
+    public function test_una_forma_de_pago_inventada_se_rechaza(): void
+    {
+        $this->signIn('admin');
+        $package = $this->package();
+
+        $this->patchJson("/api/staff/finances/packages/{$package->id}", [
+            'collected_by' => 'Henry',
+            'payment_method' => 'Criptomonedas',
+        ])->assertJsonValidationErrors('payment_method');
     }
 
     public function test_al_cliente_no_se_le_cobra_una_venta_anulada(): void

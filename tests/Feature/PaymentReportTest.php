@@ -49,7 +49,7 @@ class PaymentReportTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
-            'method' => 'sinpe',
+            'method' => 'SINPE Móvil',
             'reference' => '884412',
             'paid_on' => now()->toDateString(),
             'comment' => 'Pagado desde el BAC',
@@ -82,13 +82,15 @@ class PaymentReportTest extends TestCase
         $this->assertEqualsWithDelta(13.0, $response->json('data.amount'), 0.001);
     }
 
-    public function test_solo_se_aceptan_las_tres_formas_de_pago(): void
+    /** La lista la administra el negocio; lo que no está en ella no entra. */
+    public function test_una_forma_de_pago_fuera_de_la_lista_se_rechaza(): void
     {
         $customer = $this->customer();
         $package = $this->package($customer);
 
-        $this->postJson("/api/packages/{$package->id}/payments", $this->payload(['method' => 'tarjeta']))
-            ->assertJsonValidationErrors('method');
+        $this->postJson("/api/packages/{$package->id}/payments", $this->payload([
+            'method' => 'Criptomonedas',
+        ]))->assertJsonValidationErrors('method');
     }
 
     public function test_la_fecha_del_pago_no_puede_ser_futura(): void
